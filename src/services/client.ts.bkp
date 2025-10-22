@@ -1,0 +1,183 @@
+
+
+
+
+
+
+
+
+
+
+// The below particular code is for working AuthProvider.tsx , there are No errors and 
+// i want to add little security features so , that i am commenting .
+//We can use this in any features purpose
+
+
+// src/services/client.ts
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
+
+/**
+ * Base URL for the backend (no trailing slash).
+ * Configure via .env -> VITE_API_BASE=http://localhost:8080
+ */
+export const API_BASE =
+  (import.meta.env.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+
+// Primary Axios instance 
+export const api: AxiosInstance = axios.create({
+  baseURL: API_BASE,
+  withCredentials: false,
+  timeout: 15000,
+  headers: {
+    Accept: "application/json, text/plain, */*",
+  },
+});
+
+// Auth token provider (wired up by AuthProvider).
+let getToken: () => string | null =
+  () => localStorage.getItem("autobridge.token") || null;
+
+// Allow AuthProvider to register a getter for the current JWT. 
+export function registerTokenGetter(fn: () => string | null) {
+  getToken = fn;
+}
+
+// (Optional alias to match other code snippets) 
+export const registerTokenProvider = registerTokenGetter;
+
+// Public GET allowlist (no auth header attached) 
+const PUBLIC_GET_ALLOWLIST: RegExp[] = [
+  // services catalog
+  /^\/api\/v1\/services\/public(?:\/.*)?$/i,
+
+  // vehicles (your project exposes both; we allow either)
+  /^\/api\/v1\/vehicles\/public(?:\/.*)?$/i,
+  /^\/api\/v1\/public\/vehicles(?:\/.*)?$/i,
+
+  // image proxy and other public endpoints
+  /^\/api\/v1\/public(?:\/.*)?$/i,
+
+  // uploaded static files
+  /^\/uploads\/.*$/i,
+
+  // swagger/docs
+  /^\/v3\/api-docs(?:\/.*)?$/i,
+  /^\/swagger-ui(?:\/.*)?$/i,
+];
+
+/** DEV: log outgoing requests */
+api.interceptors.request.use((config) => {
+  const rawUrl = config.url ?? "";
+  const isAbsolute = /^https?:\/\//i.test(rawUrl);
+  const path = isAbsolute ? new URL(rawUrl).pathname : rawUrl;
+
+  const method = (config.method || "get").toLowerCase();
+  const isPublicGet =
+    method === "get" && PUBLIC_GET_ALLOWLIST.some((re) => re.test(path));
+
+  if (!isPublicGet) {
+    const token = getToken();
+    if (token) {
+      config.headers = {
+        ...(config.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      };
+    }
+  }
+
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log(
+      "[API REQUEST]",
+      (config.method || "GET").toUpperCase(),
+      isAbsolute ? rawUrl : `${API_BASE}${rawUrl}`,
+      config.headers?.Authorization ? "(auth✓)" : "(public)"
+    );
+  }
+
+  return config;
+});
+
+/** Log concise errors (method, fully-resolved URL, status, message). */
+api.interceptors.response.use(
+  (res) => {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[API RESPONSE]", res.config.method?.toUpperCase(), res.config.url, res.status);
+    }
+    return res;
+  },
+  (err) => {
+    const ax = err as AxiosError;
+    const method = ax.config?.method?.toUpperCase();
+    const url = ax.config?.url?.startsWith("http")
+      ? ax.config?.url
+      : `${API_BASE}${ax.config?.url ?? ""}`;
+    // eslint-disable-next-line no-console
+    console.error("[API ERROR]", method, url, ax.response?.status ?? "-", ax.message);
+    return Promise.reject(err);
+  }
+);
+
+/* -------------------- tiny fetch helpers (safe on empty 201/204) -------------------- */
+
+function normalizeData<T = any>(data: any): T {
+  // For 201/204 many servers return empty string; normalize to null to avoid crashes
+  if (data === "" || data === undefined) return null as any;
+  return data as T;
+}
+
+export async function getJSON<T>(url: string, cfg?: AxiosRequestConfig): Promise<T> {
+  const res = await api.get<T>(url, cfg);
+  return normalizeData<T>(res.data);
+}
+
+export async function postJSON<T>(url: string, body?: unknown, cfg?: AxiosRequestConfig): Promise<T> {
+  const res = await api.post<T>(url, body, {
+    headers: { "Content-Type": "application/json" },
+    ...(cfg || {}),
+  });
+  return normalizeData<T>(res.data);
+}
+
+export async function putJSON<T>(url: string, body?: unknown, cfg?: AxiosRequestConfig): Promise<T> {
+  const res = await api.put<T>(url, body, {
+    headers: { "Content-Type": "application/json" },
+    ...(cfg || {}),
+  });
+  return normalizeData<T>(res.data);
+}
+
+export async function patchJSON<T>(url: string, body?: unknown, cfg?: AxiosRequestConfig): Promise<T> {
+  const res = await api.patch<T>(url, body, {
+    headers: { "Content-Type": "application/json" },
+    ...(cfg || {}),
+  });
+  return normalizeData<T>(res.data);
+}
+
+export async function deleteJSON<T>(url: string, cfg?: AxiosRequestConfig): Promise<T> {
+  const res = await api.delete<T>(url, cfg);
+  return normalizeData<T>(res.data);
+}
+
+/** Aliases so older code keeps working */
+export const delJSON = deleteJSON;
+export const del = deleteJSON;
+
+/** Try multiple endpoints and return the first that succeeds. */
+export async function getFirstOk<T>(paths: string[]): Promise<T> {
+  let lastErr: unknown;
+  for (const p of paths) {
+    try {
+      const data = await getJSON<T>(p);
+      return data;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+
+/** Default export for `import api from "@/services/client"` */
+export default api;

@@ -1,0 +1,10 @@
+/* src/index.css (Tailwind v4) */
+@import "tailwindcss";
+
+:root { color-scheme: dark; }
+html, body, #root { height: 100%; }
+
+body {
+  /* if you want it a bit darker, change back to bg-slate-950 after this works */
+  @apply bg-slate-900 text-slate-100 antialiased;
+}
