@@ -351,6 +351,10 @@ export default function AgentDashboard() {
 
 
 
+
+
+/*
+//working code
  
 import { useEffect, useState } from "react";
 import {
@@ -572,7 +576,7 @@ export default function AgentDashboard() {
         </table>
       </div>
 
-      {/* Cancel modal */}
+      //{/* Cancel modal }
       {cancelFor !== null && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6">
@@ -595,6 +599,326 @@ export default function AgentDashboard() {
               />
             </label>
             {cancelErr && <div className="text-red-400 text-sm mt-2">{cancelErr}</div>}
+            <div className="flex justify-end gap-3 pt-5">
+              <button
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
+                onClick={() => setCancelFor(null)}
+              >
+                Close
+              </button>
+              <button
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50"
+                onClick={confirmCancel}
+                disabled={cancelSaving}
+              >
+                {cancelSaving ? "Cancelling…" : "Confirm Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// src/pages/agent/AgentDashboard.tsx
+import { useEffect, useState } from "react";
+import {
+  getAgentMine,
+  startRequest,
+  completeRequest,
+  cancelRequest,
+  type AgentRow,
+  type Status,
+} from "@/api/requests";
+
+function fmt(iso?: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleString();
+}
+
+function canStart(status: Status) {
+  return status === "ASSIGNED";
+}
+function canComplete(status: Status) {
+  return status === "IN_PROGRESS";
+}
+function canCancel(status: Status) {
+  return (
+    status === "PENDING" ||
+    status === "ASSIGNED" ||
+    status === "IN_PROGRESS"
+  );
+}
+
+function getCancelReason(row: any): string | null {
+  return row?.cancelReason ?? row?.cancellationReason ?? row?.reason ?? null;
+}
+function getCancelledBy(row: any): string | null {
+  return (row?.cancelledBy ?? row?.cancelledByRole ?? null) || null;
+}
+
+export default function AgentDashboard() {
+  const [rows, setRows] = useState<AgentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const [cancelFor, setCancelFor] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
+
+  async function refresh() {
+    setLoading(true);
+    setErr(null);
+    try {
+      const data = await getAgentMine();
+      setRows(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      const status = e?.response?.status ?? "ERR";
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        `Failed to load (status ${status})`;
+      setErr(msg);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    (async () => {
+      await refresh();
+    })();
+  }, []);
+
+  async function onStart(id: number) {
+    try {
+      await startRequest(id);
+      await refresh();
+    } catch (e: any) {
+      alert(`Start failed: ${e?.response?.data?.message || e?.message}`);
+    }
+  }
+
+  async function onComplete(id: number) {
+    try {
+      await completeRequest(id);
+      await refresh();
+    } catch (e: any) {
+      alert(`Complete failed: ${e?.response?.data?.message || e?.message}`);
+    }
+  }
+
+  async function confirmCancel() {
+    if (!cancelFor) return;
+    setCancelSaving(true);
+    setCancelErr(null);
+    try {
+      await cancelRequest(cancelFor, cancelReason || undefined);
+      await refresh();
+      setCancelFor(null);
+      setCancelReason("");
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        "Failed to cancel";
+      setCancelErr(msg);
+    } finally {
+      setCancelSaving(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white px-4 md:px-8 py-10 md:py-16 transition-all duration-300">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl md:text-4xl font-bold text-blue-400 mb-2 text-center md:text-left">
+          Agent Dashboard
+        </h1>
+        <p className="text-slate-400 mb-8 text-center md:text-left">
+          Manage your assigned service requests efficiently.
+        </p>
+
+        {err && (
+          <div className="rounded-xl border border-rose-800/50 bg-rose-950/30 p-4 text-rose-200 text-sm mb-6">
+            <div className="font-semibold mb-1">Error loading requests</div>
+            <div>{err}</div>
+          </div>
+        )}
+
+        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/70 backdrop-blur-md shadow-lg">
+          <table className="w-full text-sm md:text-base">
+            <thead className="bg-slate-900/80 text-slate-300 uppercase text-xs tracking-wide">
+              <tr>
+                <th className="text-left p-3 sm:p-4">ID</th>
+                <th className="text-left p-3 sm:p-4">Service</th>
+                <th className="text-left p-3 sm:p-4">Status</th>
+                <th className="text-left p-3 sm:p-4">When</th>
+                <th className="text-left p-3 sm:p-4">Vehicle</th>
+                <th className="text-left p-3 sm:p-4">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="p-4 text-center text-slate-400">
+                    Loading…
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-4 text-center text-slate-400">
+                    No assigned requests yet.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r: any) => {
+                  const statusClass =
+                    r.status === "COMPLETED"
+                      ? "text-emerald-400 font-semibold tracking-wide text-center"
+                      : r.status === "IN_PROGRESS"
+                      ? "text-blue-400 font-semibold text-center"
+                      : r.status === "ASSIGNED"
+                      ? "text-amber-400 font-semibold text-center"
+                      : r.status === "CANCELLED"
+                      ? "text-rose-400 font-semibold text-center"
+                      : "text-slate-400 font-semibold text-center";
+
+                  const reason = getCancelReason(r);
+                  const cancelledBy = getCancelledBy(r);
+
+                  return (
+                    <tr
+                      key={r.id}
+                      className="border-t border-slate-800 hover:bg-slate-800/50 transition-all duration-200"
+                    >
+                      <td className="p-3 sm:p-4">{r.id}</td>
+                      <td className="p-3 sm:p-4">{r.serviceName}</td>
+                      <td className={`p-3 sm:p-4 ${statusClass}`}>
+                        {r.status}
+                        {r.status === "CANCELLED" && reason && (
+                          <div className="mt-2 text-xs rounded-md border border-rose-900/40 bg-rose-950/40 text-rose-200 px-2 py-1">
+                            Cancelled
+                            {cancelledBy ? ` by ${cancelledBy}` : ""}: “{reason}”
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 sm:p-4 text-slate-300">
+                        {fmt(r.slotStartAtLocal)}
+                      </td>
+                      <td className="p-3 sm:p-4 text-slate-400">
+                        {r.inventoryVehicleId ?? "—"}
+                      </td>
+                      <td className="p-3 sm:p-4">
+                        <div className="flex flex-wrap gap-2">
+                          {canStart(r.status) && (
+                            <button
+                              className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 transition text-sm"
+                              onClick={() => onStart(r.id)}
+                            >
+                              Start
+                            </button>
+                          )}
+                          {canComplete(r.status) && (
+                            <button
+                              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 transition text-sm"
+                              onClick={() => onComplete(r.id)}
+                            >
+                              Complete
+                            </button>
+                          )}
+                          {canCancel(r.status) && (
+                            <button
+                              className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 transition text-sm"
+                              onClick={() => {
+                                setCancelFor(r.id);
+                                setCancelReason("");
+                                setCancelErr(null);
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Cancel Modal */}
+      {cancelFor !== null && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="font-semibold">Cancel Request #{cancelFor}</div>
+              <button
+                className="text-slate-400 hover:text-slate-200"
+                onClick={() => setCancelFor(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <label className="block">
+              <div className="text-sm mb-1">Reason (optional)</div>
+              <textarea
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
+              />
+            </label>
+            {cancelErr && (
+              <div className="text-red-400 text-sm mt-2">{cancelErr}</div>
+            )}
             <div className="flex justify-end gap-3 pt-5">
               <button
                 className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"

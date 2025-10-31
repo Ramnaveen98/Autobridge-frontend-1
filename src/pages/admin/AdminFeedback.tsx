@@ -1,5 +1,168 @@
 // src/pages/admin/AdminFeedback.tsx
 import { useEffect, useState } from "react";
+import {
+  acknowledgeFeedback,
+  FeedbackRow,
+  listAllFeedback,
+} from "@/api/feedbackAdmin";
+
+export default function AdminFeedbackPage() {
+  const [rows, setRows] = useState<FeedbackRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await listAllFeedback(0, 50);
+      setRows(list);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Failed to load feedback.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function acknowledge(id: number) {
+    try {
+      const updated = await acknowledgeFeedback(id);
+      setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    } catch (e: any) {
+      alert(e?.response?.data?.message || "Acknowledge failed.");
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-925 to-slate-900 text-gray-100">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-12">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <h1 className="text-2xl font-bold tracking-wide text-white">
+            Customer Feedback
+          </h1>
+          <button
+            onClick={load}
+            className="rounded-lg bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-blue-700/40"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-3 rounded-lg bg-red-800/20 border border-red-600 px-4 py-2 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="overflow-x-auto rounded-2xl border border-slate-700 shadow-lg shadow-blue-900/20 backdrop-blur-sm">
+          <table className="w-full text-sm min-w-[600px]">
+            <thead className="bg-slate-800/70 border-b border-slate-700">
+              <tr className="text-gray-300">
+                <th className="text-left px-4 py-3 font-semibold">Request</th>
+                <th className="text-left px-4 py-3 font-semibold">Rating</th>
+                <th className="text-left px-4 py-3 font-semibold">Comment</th>
+                <th className="text-left px-4 py-3 font-semibold">Acknowledged</th>
+                <th className="text-right px-4 py-3 font-semibold">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-gray-400 italic">
+                    Loading feedback…
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-gray-400 italic">
+                    No feedback available.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="border-t border-slate-800 hover:bg-slate-800/50 transition-colors duration-150"
+                  >
+                    <td className="px-4 py-3 font-medium text-blue-400">
+                      {r.requestId}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-[2px]">
+                        {Array.from({ length: r.rating }).map((_, i) => (
+                          <span key={i} className="text-amber-400 text-base">
+                            ★
+                          </span>
+                        ))}
+                        {Array.from({ length: 5 - r.rating }).map((_, i) => (
+                          <span key={i} className="text-slate-600 text-base">
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 max-w-[60ch] text-gray-300">
+                      {r.comment}
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.acknowledged ? (
+                        <span className="bg-green-600/20 text-green-400 px-2 py-1 rounded-md text-xs font-semibold">
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="bg-red-600/20 text-red-400 px-2 py-1 rounded-md text-xs font-semibold">
+                          No
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {!r.acknowledged && (
+                        <button
+                          onClick={() => acknowledge(r.id)}
+                          className="rounded-md border border-slate-600 hover:border-blue-600 hover:text-blue-400 px-3 py-1 text-xs font-semibold transition-colors"
+                        >
+                          Acknowledge
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-10 text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} Autobridge. All rights reserved.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+//working code
+// src/pages/admin/AdminFeedback.tsx
+import { useEffect, useState } from "react";
 import { acknowledgeFeedback, FeedbackRow, listAllFeedback } from "@/api/feedbackAdmin";
 
 export default function AdminFeedbackPage() {
@@ -91,3 +254,5 @@ export default function AdminFeedbackPage() {
     </div>
   );
 }
+
+*/

@@ -1,349 +1,55 @@
-/*
-import { useEffect, useMemo, useState } from "react";
-import { api, getJSON } from "@/services/client";
-
-type Vehicle = {
-  id: number;
-  title: string;
-  brand: string;
-  price: number | null;
-  year?: number | null;
-  imageUrl?: string | null;
-};
-
-type UpsertReq = {
-  id?: number;
-  title?: string;
-  brand?: string;
-  price?: number | null;
-  year?: number | null;
-  imageUrl?: string | null;
-
-  // fallbacks, in case backend maps these to legacy fields
-  name?: string;
-  make?: string;
-  model?: string;
-};
-
-export default function AdminVehiclePhotos() {
-  const [rows, setRows] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  // form to add a new car
-  const [newCar, setNewCar] = useState<UpsertReq>({
-    title: "", brand: "", price: null, year: null, imageUrl: ""
-  });
-
-  // per-row edit state
-  const [edit, setEdit] = useState<Record<number, UpsertReq>>({});
-  const [busyId, setBusyId] = useState<number | "CREATE" | null>(null);
-
-  const canCreate = useMemo(() => {
-    return !!(newCar.title && newCar.brand);
-  }, [newCar]);
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true); setErr(null);
-    try {
-      // Admin list endpoint
-      const data = await getJSON<Vehicle[]>("/api/v1/admin/vehicles");
-      setRows(data);
-    } catch (e) {
-      setErr("Failed to load vehicles. Ensure you are logged in as ADMIN.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function setEditField(id: number, patch: Partial<UpsertReq>) {
-    setEdit((s) => ({ ...s, [id]: { ...s[id], ...patch } }));
-  }
-
-  async function createCar() {
-    if (!canCreate) return;
-    setBusyId("CREATE");
-    try {
-      const payload: UpsertReq = {
-        title: newCar.title?.trim(),
-        brand: newCar.brand?.trim(),
-        price: numberOrNull(newCar.price),
-        year: numberOrNull(newCar.year),
-        imageUrl: newCar.imageUrl?.trim() || undefined,
-        // fallbacks to help backend map
-        name: newCar.title?.trim(),
-        make: newCar.brand?.trim(),
-      };
-      await api.post("/api/v1/admin/vehicles", payload);
-      setNewCar({ title: "", brand: "", price: null, year: null, imageUrl: "" });
-      await load();
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function saveRow(v: Vehicle) {
-    setBusyId(v.id);
-    try {
-      const draft = edit[v.id] ?? {};
-      const payload: UpsertReq = {
-        id: v.id,
-        title: val(draft.title, v.title),
-        brand: val(draft.brand, v.brand),
-        price: draft.price ?? v.price ?? null,
-        year: draft.year ?? v.year ?? null,
-        imageUrl: val(draft.imageUrl, v.imageUrl || ""),
-        name: val(draft.title, v.title),
-        make: val(draft.brand, v.brand),
-      };
-      await api.put(`/api/v1/admin/vehicles/${v.id}`, payload);
-      await load();
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function deleteRow(v: Vehicle) {
-    if (!confirm(`Delete "${v.title}"? This cannot be undone.`)) return;
-    setBusyId(v.id);
-    try {
-      await api.delete(`/api/v1/admin/vehicles/${v.id}`);
-      await load();
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function setImageUrl(v: Vehicle, url: string) {
-    setBusyId(v.id);
-    try {
-      await api.put(`/api/v1/admin/vehicles/${v.id}/image`, { imageUrl: url });
-      await load();
-    } finally { setBusyId(null); }
-  }
-
-  async function uploadImage(v: Vehicle, file: File) {
-    setBusyId(v.id);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      await api.post(`/api/v1/admin/vehicles/${v.id}/image-upload`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      await load();
-    } finally { setBusyId(null); }
-  }
-
-  return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Manage Vehicles</h1>
-
-      
-      <section className="rounded-2xl p-4 border border-slate-800 bg-slate-900/60 mb-8">
-        <h2 className="text-lg font-medium mb-3">Add New Car</h2>
-        <div className="grid md:grid-cols-5 gap-3">
-          <input
-            placeholder="Title (e.g., Toyota Camry)"
-            value={newCar.title ?? ""}
-            onChange={e => setNewCar(s => ({ ...s, title: e.target.value }))}
-            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-          />
-          <input
-            placeholder="Brand (e.g., Toyota)"
-            value={newCar.brand ?? ""}
-            onChange={e => setNewCar(s => ({ ...s, brand: e.target.value }))}
-            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-          />
-          <input
-            placeholder="Price (e.g., 21990)"
-            value={newCar.price ?? ""}
-            onChange={e => setNewCar(s => ({ ...s, price: num(e.target.value) }))}
-            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-          />
-          <input
-            placeholder="Year (e.g., 2022)"
-            value={newCar.year ?? ""}
-            onChange={e => setNewCar(s => ({ ...s, year: num(e.target.value) }))}
-            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-          />
-          <input
-            placeholder="Image URL (optional)"
-            value={newCar.imageUrl ?? ""}
-            onChange={e => setNewCar(s => ({ ...s, imageUrl: e.target.value }))}
-            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-          />
-        </div>
-        <div className="mt-3">
-          <button
-            disabled={!canCreate || busyId === "CREATE"}
-            onClick={createCar}
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-60"
-          >
-            {busyId === "CREATE" ? "Adding…" : "Add Car"}
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-slate-400">
-          Tip: Add the car first, then use “Choose File” on that row to upload a photo.
-        </p>
-      </section>
-
-      {err && <div className="text-red-400 mb-3">{err}</div>}
-      {loading && <div className="opacity-80">Loading…</div>}
-
-      
-      <div className="grid md:grid-cols-2 gap-6">
-        {rows.map(v => {
-          const d = edit[v.id] ?? {};
-          return (
-            <div key={v.id} className="rounded-2xl p-4 border border-slate-800 bg-slate-900/60">
-              <div className="flex gap-4">
-                <div className="w-48 aspect-video overflow-hidden rounded-xl border bg-black/30">
-                  {v.imageUrl ? (
-                    <img className="w-full h-full object-cover" src={v.imageUrl} />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
-                      No image
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      defaultValue={v.title}
-                      onChange={e => setEditField(v.id, { title: e.target.value })}
-                      placeholder="Title"
-                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 col-span-2"
-                    />
-                    <input
-                      defaultValue={v.brand}
-                      onChange={e => setEditField(v.id, { brand: e.target.value })}
-                      placeholder="Brand"
-                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-                    />
-                    <input
-                      defaultValue={v.price ?? undefined}
-                      onChange={e => setEditField(v.id, { price: num(e.target.value) })}
-                      placeholder="Price"
-                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-                    />
-                    <input
-                      defaultValue={v.year ?? undefined}
-                      onChange={e => setEditField(v.id, { year: num(e.target.value) })}
-                      placeholder="Year"
-                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-                    />
-                    <div className="col-span-2 flex gap-2">
-                      <input
-                        defaultValue={v.imageUrl ?? ""}
-                        onChange={e => setEditField(v.id, { imageUrl: e.target.value })}
-                        placeholder="Image URL"
-                        className="flex-1 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-                      />
-                      <button
-                        disabled={busyId === v.id}
-                        onClick={() => setImageUrl(v, d.imageUrl ?? v.imageUrl ?? "")}
-                        className="px-3 py-2 rounded-xl bg-slate-800"
-                      >
-                        Save URL
-                      </button>
-                    </div>
-                    <div className="col-span-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) uploadImage(v, file);
-                        }}
-                        className="block w-full text-sm text-slate-300
-                                   file:mr-4 file:py-2 file:px-3
-                                   file:rounded-xl file:border-0
-                                   file:bg-blue-600 file:text-white
-                                   hover:file:opacity-90"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      disabled={busyId === v.id}
-                      onClick={() => saveRow(v)}
-                      className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-sm"
-                    >
-                      {busyId === v.id ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      disabled={busyId === v.id}
-                      onClick={() => deleteRow(v)}
-                      className="px-3 py-1.5 rounded-xl bg-red-600 text-white text-sm"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-
-function num(v: string): number | null {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-function val<T>(v: T | undefined, fallback: T): T {
-  return (v === undefined || (typeof v === "string" && v.trim() === "")) ? fallback : v;
-}
-function numberOrNull(v: any): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-*/
-
-
 // src/pages/admin/AdminVehiclePhotos.tsx
 import { useEffect, useMemo, useState } from "react";
 import { api, getJSON, API_BASE } from "@/services/client";
 
+/* ===== Types ===== */
+
 type Vehicle = {
   id: number;
+  vin?: string | null;
   title: string;
   brand: string;
+  model?: string | null;
+  color?: string | null;
   year: number | null;
   price: number | null;
-  imageUrl?: string | null;
-  // backend also returns extra fields (vin, model, etc.) which we ignore here
+  status?: string | null;          // "AVAILABLE" | "PENDING" | "RESERVED" | "SOLD" (etc.)
+  imageUrl?: string | null;        // server may send imageUrl or image_url
+  description?: string | null;
 };
 
-type Upsert = {
-  id?: number;
-  title?: string;
-  brand?: string;
-  year?: number | null;
-  price?: number | null;
-  imageUrl?: string | null;
-  // aliases to be safe with any legacy mapping
+type Upsert = Partial<Vehicle> & {
+  // aliases the backend accepts
   name?: string;
   make?: string;
 };
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 
+/* Reasonable defaults for your enum */
+const STATUS_OPTS = ["AVAILABLE", "PENDING", "RESERVED", "SOLD"];
+
 export default function AdminVehiclePhotos() {
   const [rows, setRows] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // create form
-  const [draftNew, setDraftNew] = useState<Upsert>({ title: "", brand: "", year: null, price: null, imageUrl: "" });
-  const canCreate = useMemo(() => !!(draftNew.title && draftNew.brand), [draftNew]);
+  // create form (no image url here; upload after create)
+  const [draftNew, setDraftNew] = useState<Upsert>({
+    vin: "",
+    title: "",
+    brand: "",
+    model: "",
+    color: "",
+    year: null,
+    price: null,
+    status: "",
+    description: "",
+  });
+  const canCreate = useMemo(
+    () => !!(draftNew.title && draftNew.brand),
+    [draftNew]
+  );
 
   // per-row edits
   const [edit, setEdit] = useState<Record<number, Upsert>>({});
@@ -355,10 +61,25 @@ export default function AdminVehiclePhotos() {
   useEffect(() => { load(); }, []);
 
   async function load() {
-    setErr(null); setLoading(true);
+    setErr(null);
+    setLoading(true);
     try {
-      const data = await getJSON<Vehicle[]>("/api/v1/admin/vehicles");
-      setRows(Array.isArray(data) ? data : []);
+      const raw = await getJSON<any[]>("/api/v1/admin/vehicles");
+      const data: Vehicle[] = (Array.isArray(raw) ? raw : []).map((r) => ({
+        id: r.id,
+        vin: r.vin ?? "",
+        title: r.title,
+        brand: r.brand,
+        model: r.model ?? "",
+        color: r.color ?? "",
+        year: r.year ?? null,
+        price: r.price ?? null,
+        status: r.status ?? null,
+        imageUrl: r.imageUrl ?? r.image_url ?? null, // backend may use either
+        description: r.description ?? "",
+      }));
+      data.sort((a, b) => b.id - a.id);
+      setRows(data);
     } catch (e: any) {
       setErr("Failed to load vehicles: " + explain(e));
     } finally {
@@ -366,47 +87,76 @@ export default function AdminVehiclePhotos() {
     }
   }
 
+  /* ===== Utils ===== */
+
   function explain(e: any) {
     const st = e?.response?.status;
-    const msg = e?.response?.data?.message || e?.response?.data || e?.message || "Unknown error";
+    const msg =
+      e?.response?.data?.message || e?.response?.data || e?.message || "Unknown error";
     return `(${st ?? "?"}) ${String(msg)}`.slice(0, 300);
   }
   function toast(kind: Toast["kind"], text: string) {
     const id = Date.now() + Math.random();
-    setToasts(t => [...t, { id, kind, text }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+    setToasts((t) => [...t, { id, kind, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
   }
   function setEditField(id: number, patch: Partial<Upsert>) {
-    setEdit(s => ({ ...s, [id]: { ...(s[id] ?? {}), ...patch } }));
+    setEdit((s) => ({ ...s, [id]: { ...(s[id] ?? {}), ...patch } }));
   }
-  function numOrNull(v: string) { const n = Number(v); return Number.isFinite(n) ? n : null; }
-  function keep<T>(v: T | undefined, fb: T): T { return v === undefined || (typeof v === "string" && v.trim() === "") ? fb : v; }
-  function normalizeUrl(u?: string | null) {
-    const s = (u ?? "").trim();
-    if (!s) return undefined;
-    if (s.startsWith("/uploads/")) return s;
-    if (/^https?:\/\//i.test(s)) return `/api/v1/public/image-proxy?url=${encodeURIComponent(s)}`;
-    return s;
+  function numOrNull(v: string) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  function keep<T>(v: T | undefined, fb: T): T {
+    return v === undefined || (typeof v === "string" && v.trim() === "") ? fb : v;
+  }
+  function resolveImg(u?: string | null) {
+    if (!u) return "";
+    if (/^https?:\/\//i.test(u)) return u;
+    if (u.startsWith("/")) return `${API_BASE}${u}`;
+    return u;
+  }
+  function fileNameFromUrl(u?: string | null) {
+    if (!u) return "";
+    const q = u.split("?")[0];
+    const parts = q.split("/");
+    return parts[parts.length - 1] || "";
   }
   function notifyInventoryChanged() {
     window.dispatchEvent(new CustomEvent("autobridge:inventory:changed"));
   }
 
-  /* -------------------- create / update / delete -------------------- */
+  /* ===== CRUD ===== */
 
   async function create() {
     if (!canCreate) return;
     setBusy("CREATE");
     try {
       const payload: Upsert = {
-        title: draftNew.title?.trim(), name: draftNew.title?.trim(),
-        brand: draftNew.brand?.trim(), make: draftNew.brand?.trim(),
+        vin: draftNew.vin?.trim(),
+        title: draftNew.title?.trim(),
+        name: draftNew.title?.trim(),
+        brand: draftNew.brand?.trim(),
+        make: draftNew.brand?.trim(),
+        model: draftNew.model?.trim(),
+        color: draftNew.color?.trim(),
         year: draftNew.year ?? null,
         price: draftNew.price ?? null,
-        imageUrl: normalizeUrl(draftNew.imageUrl),
+        status: draftNew.status?.trim() || undefined,
+        description: draftNew.description?.trim() || undefined,
       };
       await api.post("/api/v1/admin/vehicles", payload);
-      setDraftNew({ title: "", brand: "", year: null, price: null, imageUrl: "" });
+      setDraftNew({
+        vin: "",
+        title: "",
+        brand: "",
+        model: "",
+        color: "",
+        year: null,
+        price: null,
+        status: "",
+        description: "",
+      });
       await load();
       toast("ok", "Car added");
       notifyInventoryChanged();
@@ -423,11 +173,18 @@ export default function AdminVehiclePhotos() {
       const d = edit[v.id] ?? {};
       const payload: Upsert = {
         id: v.id,
-        title: keep(d.title, v.title), name: keep(d.title, v.title),
-        brand: keep(d.brand, v.brand), make: keep(d.brand, v.brand),
+        vin: d.vin !== undefined ? d.vin : v.vin,
+        title: keep(d.title, v.title),
+        name: keep(d.title, v.title),
+        brand: keep(d.brand, v.brand),
+        make: keep(d.brand, v.brand),
+        model: d.model !== undefined ? d.model : v.model,
+        color: d.color !== undefined ? d.color : v.color,
         year: d.year ?? v.year ?? null,
         price: d.price ?? v.price ?? null,
-        imageUrl: normalizeUrl(keep(d.imageUrl, v.imageUrl ?? "")),
+        status: d.status !== undefined ? d.status : v.status,
+        description: d.description !== undefined ? d.description : v.description,
+        // imageUrl is managed by upload; no manual edits here
       };
       await api.put(`/api/v1/admin/vehicles/${v.id}`, payload);
       await load();
@@ -455,17 +212,509 @@ export default function AdminVehiclePhotos() {
     }
   }
 
-  async function saveImageUrl(v: Vehicle, url: string) {
+  async function uploadImage(v: Vehicle, file: File) {
     setBusy(v.id);
     try {
-      const finalUrl = normalizeUrl(url) ?? "";
-      await api.put(`/api/v1/admin/vehicles/${v.id}/image`, { imageUrl: finalUrl });
-      await load();
-      toast("ok", "Image URL saved");
+      const form = new FormData();
+      form.append("file", file);
+      await api.post(`/api/v1/admin/vehicles/${v.id}/image-upload`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      await load();            // server already saved image_url; refresh to show it
+      toast("ok", "Image uploaded");
       notifyInventoryChanged();
     } catch (e: any) {
-      toast("err", "Save URL failed: " + explain(e));
-    } finally { setBusy(null); }
+      toast("err", "Upload failed: " + explain(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /* ===== UI ===== */
+
+  return (
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+      {/* toasts */}
+      <div className="fixed right-3 sm:right-4 top-16 z-50 space-y-2">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`px-3 py-2 rounded-lg shadow ${t.kind === "ok" ? "bg-green-600" : "bg-red-600"} text-white`}
+          >
+            {t.text}
+          </div>
+        ))}
+      </div>
+
+      <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-center sm:text-left">
+        Manage Vehicles
+      </h1>
+
+      {/* create */}
+      <section className="rounded-2xl p-4 sm:p-6 border border-slate-800 bg-slate-900/60 mb-6 sm:mb-8">
+        <h2 className="text-lg font-medium mb-3 sm:mb-4">Add New Car</h2>
+
+        {/* 1-col mobile, 2-col tablet, 6-col desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 sm:gap-4">
+          <input
+            placeholder="VIN"
+            value={draftNew.vin ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, vin: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          />
+          <input
+            placeholder="Title (e.g., Honda Model 14)"
+            value={draftNew.title ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, title: e.target.value }))}
+            className="md:col-span-2 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          />
+          <input
+            placeholder="Brand (e.g., Honda)"
+            value={draftNew.brand ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, brand: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          />
+          <input
+            placeholder="Model"
+            value={draftNew.model ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, model: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          />
+          <input
+            placeholder="Color"
+            value={draftNew.color ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, color: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          />
+
+          <input
+            placeholder="Year (e.g., 2025)"
+            value={draftNew.year ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, year: numOrNull(e.target.value) }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          />
+          <input
+            placeholder="Price (e.g., 31000)"
+            value={draftNew.price ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, price: numOrNull(e.target.value) }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          />
+          <select
+            value={draftNew.status ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, status: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+          >
+            <option value="">— Status —</option>
+            {STATUS_OPTS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <textarea
+            placeholder="Description (optional)"
+            value={draftNew.description ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, description: e.target.value }))}
+            className="md:col-span-6 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 min-h-[70px] w-full"
+          />
+        </div>
+
+        <div className="mt-3 sm:mt-4">
+          <button
+            disabled={!canCreate || busy === "CREATE"}
+            onClick={create}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-60 hover:opacity-95"
+          >
+            {busy === "CREATE" ? "Adding…" : "Add Car"}
+          </button>
+        </div>
+
+        <p className="mt-2 text-xs text-slate-400">
+          Tip: After creating the car, use “Choose File” on that row to upload a photo. The server will
+          store the file and automatically update <code>image_url</code>.
+        </p>
+      </section>
+
+      {err && <div className="text-red-400 mb-3">{err}</div>}
+      {loading && <div className="opacity-80">Loading…</div>}
+
+      {/* cards: 1 col on mobile, 2 on md, 3 on xl, 4 on 2xl */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5 sm:gap-6">
+        {rows.map((v) => {
+          const d = edit[v.id] ?? {};
+          const img = resolveImg(v.imageUrl);
+          const fname = fileNameFromUrl(v.imageUrl);
+
+          return (
+            <div
+              key={v.id}
+              className="h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/60 shadow-sm hover:shadow-md transition-shadow"
+            >
+              {/* Image on top for a clean, consistent card */}
+              <div className="w-full aspect-[16/9] md:aspect-[3/2] bg-black/30">
+                {v.imageUrl ? (
+                  <img
+                    className="w-full h-full object-cover"
+                    src={img}
+                    alt={v.title}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.25"; }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+                    No image
+                  </div>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="p-4 sm:p-5">
+                {/* Inputs grid: 1-col on mobile, 2-col on >=sm */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+                  <input
+                    defaultValue={v.vin ?? ""}
+                    onChange={(e) => setEditField(v.id, { vin: e.target.value })}
+                    placeholder="VIN"
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  />
+                  <input
+                    defaultValue={v.title}
+                    onChange={(e) => setEditField(v.id, { title: e.target.value })}
+                    placeholder="Title"
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  />
+
+                  <input
+                    defaultValue={v.brand}
+                    onChange={(e) => setEditField(v.id, { brand: e.target.value })}
+                    placeholder="Brand"
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  />
+                  <input
+                    defaultValue={v.model ?? ""}
+                    onChange={(e) => setEditField(v.id, { model: e.target.value })}
+                    placeholder="Model"
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  />
+
+                  <input
+                    defaultValue={v.color ?? ""}
+                    onChange={(e) => setEditField(v.id, { color: e.target.value })}
+                    placeholder="Color"
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  />
+                  <input
+                    defaultValue={v.year ?? undefined}
+                    onChange={(e) => setEditField(v.id, { year: numOrNull(e.target.value) })}
+                    placeholder="Year"
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  />
+
+                  <input
+                    defaultValue={v.price ?? undefined}
+                    onChange={(e) => setEditField(v.id, { price: numOrNull(e.target.value) })}
+                    placeholder="Price"
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  />
+                  <select
+                    defaultValue={v.status ?? ""}
+                    onChange={(e) => setEditField(v.id, { status: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 w-full"
+                  >
+                    <option value="">— Status —</option>
+                    {STATUS_OPTS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+
+                  {/* read-only image url info */}
+                  <div className="sm:col-span-2 text-xs text-slate-400 space-y-1.5">
+                    {v.imageUrl ? (
+                      <>
+                        <div className="break-words">
+                          URL:{" "}
+                          <a className="underline break-all" href={img} target="_blank" rel="noreferrer">
+                            {v.imageUrl}
+                          </a>
+                        </div>
+                        <div>
+                          Stored file: <span className="font-mono">{fname}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div>URL: —</div>
+                    )}
+                  </div>
+
+                  {/* file upload */}
+                  <div className="sm:col-span-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadImage(v, file);
+                      }}
+                      className="block w-full text-sm text-slate-300
+                                 file:mr-4 file:py-2 file:px-3
+                                 file:rounded-xl file:border-0
+                                 file:bg-blue-600 file:text-white
+                                 hover:file:opacity-90"
+                    />
+                  </div>
+
+                  {/* description */}
+                  <textarea
+                    defaultValue={v.description ?? ""}
+                    onChange={(e) => setEditField(v.id, { description: e.target.value })}
+                    placeholder="Description"
+                    className="sm:col-span-2 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 min-h-[70px] w-full"
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                  <button
+                    disabled={busy === v.id}
+                    onClick={() => save(v)}
+                    className="w-full sm:w-auto px-3 py-2 rounded-xl bg-blue-600 text-white text-sm hover:opacity-95 disabled:opacity-60"
+                  >
+                    {busy === v.id ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    disabled={busy === v.id}
+                    onClick={() => remove(v)}
+                    className="w-full sm:w-auto px-3 py-2 rounded-xl bg-red-600 text-white text-sm hover:opacity-95 disabled:opacity-60"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+/*
+
+// src/pages/admin/AdminVehiclePhotos.tsx
+import { useEffect, useMemo, useState } from "react";
+import { api, getJSON, API_BASE } from "@/services/client";
+
+
+
+type Vehicle = {
+  id: number;
+  vin?: string | null;
+  title: string;
+  brand: string;
+  model?: string | null;
+  color?: string | null;
+  year: number | null;
+  price: number | null;
+  status?: string | null;          // "AVAILABLE" | "PENDING" | "RESERVED" | "SOLD" (etc.)
+  imageUrl?: string | null;        // server may send imageUrl or image_url
+  description?: string | null;
+};
+
+type Upsert = Partial<Vehicle> & {
+  // aliases the backend accepts
+  name?: string;
+  make?: string;
+};
+
+type Toast = { id: number; kind: "ok" | "err"; text: string };
+
+
+const STATUS_OPTS = ["AVAILABLE", "PENDING", "RESERVED", "SOLD"];
+
+export default function AdminVehiclePhotos() {
+  const [rows, setRows] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // create form (no image url here; upload after create)
+  const [draftNew, setDraftNew] = useState<Upsert>({
+    vin: "",
+    title: "",
+    brand: "",
+    model: "",
+    color: "",
+    year: null,
+    price: null,
+    status: "",
+    description: "",
+  });
+  const canCreate = useMemo(
+    () => !!(draftNew.title && draftNew.brand),
+    [draftNew]
+  );
+
+  // per-row edits
+  const [edit, setEdit] = useState<Record<number, Upsert>>({});
+  const [busy, setBusy] = useState<number | "CREATE" | null>(null);
+
+  // toasts
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setErr(null);
+    setLoading(true);
+    try {
+      const raw = await getJSON<any[]>("/api/v1/admin/vehicles");
+      const data: Vehicle[] = (Array.isArray(raw) ? raw : []).map((r) => ({
+        id: r.id,
+        vin: r.vin ?? "",
+        title: r.title,
+        brand: r.brand,
+        model: r.model ?? "",
+        color: r.color ?? "",
+        year: r.year ?? null,
+        price: r.price ?? null,
+        status: r.status ?? null,
+        imageUrl: r.imageUrl ?? r.image_url ?? null, // backend may use either
+        description: r.description ?? "",
+      }));
+      data.sort((a, b) => b.id - a.id);
+      setRows(data);
+    } catch (e: any) {
+      setErr("Failed to load vehicles: " + explain(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+ 
+
+  function explain(e: any) {
+    const st = e?.response?.status;
+    const msg =
+      e?.response?.data?.message || e?.response?.data || e?.message || "Unknown error";
+    return `(${st ?? "?"}) ${String(msg)}`.slice(0, 300);
+  }
+  function toast(kind: Toast["kind"], text: string) {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t, { id, kind, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
+  }
+  function setEditField(id: number, patch: Partial<Upsert>) {
+    setEdit((s) => ({ ...s, [id]: { ...(s[id] ?? {}), ...patch } }));
+  }
+  function numOrNull(v: string) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  function keep<T>(v: T | undefined, fb: T): T {
+    return v === undefined || (typeof v === "string" && v.trim() === "") ? fb : v;
+  }
+  function resolveImg(u?: string | null) {
+    if (!u) return "";
+    if (/^https?:\/\//i.test(u)) return u;
+    if (u.startsWith("/")) return `${API_BASE}${u}`;
+    return u;
+  }
+  function fileNameFromUrl(u?: string | null) {
+    if (!u) return "";
+    const q = u.split("?")[0];
+    const parts = q.split("/");
+    return parts[parts.length - 1] || "";
+  }
+  function notifyInventoryChanged() {
+    window.dispatchEvent(new CustomEvent("autobridge:inventory:changed"));
+  }
+
+ 
+
+  async function create() {
+    if (!canCreate) return;
+    setBusy("CREATE");
+    try {
+      const payload: Upsert = {
+        vin: draftNew.vin?.trim(),
+        title: draftNew.title?.trim(),
+        name: draftNew.title?.trim(),
+        brand: draftNew.brand?.trim(),
+        make: draftNew.brand?.trim(),
+        model: draftNew.model?.trim(),
+        color: draftNew.color?.trim(),
+        year: draftNew.year ?? null,
+        price: draftNew.price ?? null,
+        status: draftNew.status?.trim() || undefined,
+        description: draftNew.description?.trim() || undefined,
+      };
+      await api.post("/api/v1/admin/vehicles", payload);
+      setDraftNew({
+        vin: "",
+        title: "",
+        brand: "",
+        model: "",
+        color: "",
+        year: null,
+        price: null,
+        status: "",
+        description: "",
+      });
+      await load();
+      toast("ok", "Car added");
+      notifyInventoryChanged();
+    } catch (e: any) {
+      toast("err", "Create failed: " + explain(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function save(v: Vehicle) {
+    setBusy(v.id);
+    try {
+      const d = edit[v.id] ?? {};
+      const payload: Upsert = {
+        id: v.id,
+        vin: d.vin !== undefined ? d.vin : v.vin,
+        title: keep(d.title, v.title),
+        name: keep(d.title, v.title),
+        brand: keep(d.brand, v.brand),
+        make: keep(d.brand, v.brand),
+        model: d.model !== undefined ? d.model : v.model,
+        color: d.color !== undefined ? d.color : v.color,
+        year: d.year ?? v.year ?? null,
+        price: d.price ?? v.price ?? null,
+        status: d.status !== undefined ? d.status : v.status,
+        description: d.description !== undefined ? d.description : v.description,
+        // imageUrl is managed by upload; no manual edits here
+      };
+      await api.put(`/api/v1/admin/vehicles/${v.id}`, payload);
+      await load();
+      toast("ok", "Saved");
+      notifyInventoryChanged();
+    } catch (e: any) {
+      toast("err", "Save failed: " + explain(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(v: Vehicle) {
+    if (!confirm(`Delete "${v.title}"?`)) return;
+    setBusy(v.id);
+    try {
+      await api.delete(`/api/v1/admin/vehicles/${v.id}`);
+      await load();
+      toast("ok", "Deleted");
+      notifyInventoryChanged();
+    } catch (e: any) {
+      toast("err", "Delete failed: " + explain(e));
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function uploadImage(v: Vehicle, file: File) {
@@ -476,30 +725,27 @@ export default function AdminVehiclePhotos() {
       await api.post(`/api/v1/admin/vehicles/${v.id}/image-upload`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      await load();
+      await load();            // server already saved image_url; refresh to show it
       toast("ok", "Image uploaded");
       notifyInventoryChanged();
     } catch (e: any) {
       toast("err", "Upload failed: " + explain(e));
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+    }
   }
-        function resolveImg(u?: string | null) 
-        {
-        if (!u) return "";
-        if (/^https?:\/\//i.test(u)) return u;        // already absolute
-        if (u.startsWith("/")) return `${API_BASE}${u}`; // make absolute to backend
-        return u; // anything else
-        }
 
-
-  /* -------------------- UI -------------------- */
+ 
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* toasts */}
+      //{}
       <div className="fixed right-4 top-16 z-50 space-y-2">
-        {toasts.map(t => (
-          <div key={t.id} className={`px-3 py-2 rounded-lg shadow ${t.kind==="ok"?"bg-green-600":"bg-red-600"} text-white`}>
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`px-3 py-2 rounded-lg shadow ${t.kind === "ok" ? "bg-green-600" : "bg-red-600"} text-white`}
+          >
             {t.text}
           </div>
         ))}
@@ -507,41 +753,72 @@ export default function AdminVehiclePhotos() {
 
       <h1 className="text-2xl font-semibold mb-6">Manage Vehicles</h1>
 
-      {/* create */}
+     // {}
       <section className="rounded-2xl p-4 border border-slate-800 bg-slate-900/60 mb-8">
         <h2 className="text-lg font-medium mb-3">Add New Car</h2>
-        <div className="grid md:grid-cols-5 gap-3">
+        <div className="grid md:grid-cols-6 gap-3">
           <input
-            placeholder="Title (e.g., Toyota Camry)"
+            placeholder="VIN"
+            value={draftNew.vin ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, vin: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+          />
+          <input
+            placeholder="Title (e.g., Honda Model 14)"
             value={draftNew.title ?? ""}
-            onChange={e => setDraftNew(s => ({ ...s, title: e.target.value }))}
-            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+            onChange={(e) => setDraftNew((s) => ({ ...s, title: e.target.value }))}
+            className="md:col-span-2 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
           />
           <input
-            placeholder="Brand (e.g., Toyota)"
+            placeholder="Brand (e.g., Honda)"
             value={draftNew.brand ?? ""}
-            onChange={e => setDraftNew(s => ({ ...s, brand: e.target.value }))}
+            onChange={(e) => setDraftNew((s) => ({ ...s, brand: e.target.value }))}
             className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
           />
           <input
-            placeholder="Price (e.g., 21990)"
-            value={draftNew.price ?? ""}
-            onChange={e => setDraftNew(s => ({ ...s, price: numOrNull(e.target.value) }))}
+            placeholder="Model"
+            value={draftNew.model ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, model: e.target.value }))}
             className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
           />
           <input
-            placeholder="Year (e.g., 2024)"
+            placeholder="Color"
+            value={draftNew.color ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, color: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+          />
+
+          <input
+            placeholder="Year (e.g., 2025)"
             value={draftNew.year ?? ""}
-            onChange={e => setDraftNew(s => ({ ...s, year: numOrNull(e.target.value) }))}
+            onChange={(e) => setDraftNew((s) => ({ ...s, year: numOrNull(e.target.value) }))}
             className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
           />
           <input
-            placeholder="Image URL (optional)"
-            value={draftNew.imageUrl ?? ""}
-            onChange={e => setDraftNew(s => ({ ...s, imageUrl: e.target.value }))}
+            placeholder="Price (e.g., 31000)"
+            value={draftNew.price ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, price: numOrNull(e.target.value) }))}
             className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+          />
+          <select
+            value={draftNew.status ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, status: e.target.value }))}
+            className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+          >
+            <option value="">— Status —</option>
+            {STATUS_OPTS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <textarea
+            placeholder="Description (optional)"
+            value={draftNew.description ?? ""}
+            onChange={(e) => setDraftNew((s) => ({ ...s, description: e.target.value }))}
+            className="md:col-span-6 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 min-h-[70px]"
           />
         </div>
+
         <div className="mt-3">
           <button
             disabled={!canCreate || busy === "CREATE"}
@@ -551,77 +828,112 @@ export default function AdminVehiclePhotos() {
             {busy === "CREATE" ? "Adding…" : "Add Car"}
           </button>
         </div>
+
         <p className="mt-2 text-xs text-slate-400">
-          Tip: You can either paste an external image URL and click “Save URL”, or upload a file with “Choose File”.
+          Tip: After creating the car, use “Choose File” on that row to upload a photo. The server will
+          store the file and automatically update <code>image_url</code>.
         </p>
       </section>
 
       {err && <div className="text-red-400 mb-3">{err}</div>}
       {loading && <div className="opacity-80">Loading…</div>}
 
-      {/* cards */}
+     // {}
       <div className="grid md:grid-cols-2 gap-6">
-        {rows.map(v => {
+        {rows.map((v) => {
           const d = edit[v.id] ?? {};
+          const img = resolveImg(v.imageUrl);
+          const fname = fileNameFromUrl(v.imageUrl);
+
           return (
             <div key={v.id} className="rounded-2xl p-4 border border-slate-800 bg-slate-900/60">
               <div className="flex gap-4">
                 <div className="w-48 aspect-video overflow-hidden rounded-xl border bg-black/30">
                   {v.imageUrl ? (
                     <img
-                        className="w-full h-full object-cover"
-                        src={resolveImg(v.imageUrl)}
-                        alt={v.title}
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.25"; }}
-                        />
-
+                      className="w-full h-full object-cover"
+                      src={img}
+                      alt={v.title}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.25"; }}
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
                       No image
                     </div>
                   )}
                 </div>
+
                 <div className="flex-1">
                   <div className="grid grid-cols-2 gap-2">
                     <input
-                      defaultValue={v.title}
-                      onChange={e => setEditField(v.id, { title: e.target.value })}
-                      placeholder="Title"
-                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 col-span-2"
+                      defaultValue={v.vin ?? ""}
+                      onChange={(e) => setEditField(v.id, { vin: e.target.value })}
+                      placeholder="VIN"
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
                     />
                     <input
+                      defaultValue={v.title}
+                      onChange={(e) => setEditField(v.id, { title: e.target.value })}
+                      placeholder="Title"
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+                    />
+
+                    <input
                       defaultValue={v.brand}
-                      onChange={e => setEditField(v.id, { brand: e.target.value })}
+                      onChange={(e) => setEditField(v.id, { brand: e.target.value })}
                       placeholder="Brand"
                       className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
                     />
                     <input
-                      defaultValue={v.price ?? undefined}
-                      onChange={e => setEditField(v.id, { price: numOrNull(e.target.value) })}
-                      placeholder="Price"
+                      defaultValue={v.model ?? ""}
+                      onChange={(e) => setEditField(v.id, { model: e.target.value })}
+                      placeholder="Model"
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+                    />
+
+                    <input
+                      defaultValue={v.color ?? ""}
+                      onChange={(e) => setEditField(v.id, { color: e.target.value })}
+                      placeholder="Color"
                       className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
                     />
                     <input
                       defaultValue={v.year ?? undefined}
-                      onChange={e => setEditField(v.id, { year: numOrNull(e.target.value) })}
+                      onChange={(e) => setEditField(v.id, { year: numOrNull(e.target.value) })}
                       placeholder="Year"
                       className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
                     />
-                    <div className="col-span-2 flex gap-2">
-                      <input
-                        defaultValue={v.imageUrl ?? ""}
-                        onChange={e => setEditField(v.id, { imageUrl: e.target.value })}
-                        placeholder="Image URL"
-                        className="flex-1 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
-                      />
-                      <button
-                        disabled={busy === v.id}
-                        onClick={() => saveImageUrl(v, d.imageUrl ?? v.imageUrl ?? "")}
-                        className="px-3 py-2 rounded-xl bg-slate-800"
-                      >
-                        Save URL
-                      </button>
+
+                    <input
+                      defaultValue={v.price ?? undefined}
+                      onChange={(e) => setEditField(v.id, { price: numOrNull(e.target.value) })}
+                      placeholder="Price"
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+                    />
+                    <select
+                      defaultValue={v.status ?? ""}
+                      onChange={(e) => setEditField(v.id, { status: e.target.value })}
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+                    >
+                      <option value="">— Status —</option>
+                      {STATUS_OPTS.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+
+                    //{}
+                    <div className="col-span-2 text-xs text-slate-400">
+                      {v.imageUrl ? (
+                        <>
+                          <div>URL: <a className="underline" href={img} target="_blank" rel="noreferrer">{v.imageUrl}</a></div>
+                          <div>Stored file: <span className="font-mono">{fname}</span></div>
+                        </>
+                      ) : (
+                        <div>URL: —</div>
+                      )}
                     </div>
+
+                    //{}
                     <div className="col-span-2">
                       <input
                         type="file"
@@ -637,6 +949,14 @@ export default function AdminVehiclePhotos() {
                                    hover:file:opacity-90"
                       />
                     </div>
+
+                   // {}
+                    <textarea
+                      defaultValue={v.description ?? ""}
+                      onChange={(e) => setEditField(v.id, { description: e.target.value })}
+                      placeholder="Description"
+                      className="col-span-2 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 min-h-[70px]"
+                    />
                   </div>
 
                   <div className="mt-3 flex gap-2">
@@ -664,3 +984,6 @@ export default function AdminVehiclePhotos() {
     </div>
   );
 }
+
+
+*/

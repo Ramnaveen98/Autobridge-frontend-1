@@ -1,104 +1,132 @@
-/*
 // src/pages/agent/AgentFeedback.tsx
 import { useEffect, useState } from "react";
-import { getJSON } from "@/services/client";
+import { FeedbackRow, listAgentFeedback } from "@/api/feedbackAdmin";
 
-type AgentFeedbackRow = {
-  id: number;
-  requestId: number;
-  serviceName?: string | null;
-  rating: number;
-  comment?: string | null;
-  author?: string | null;
-  createdAt?: string | null;
-};
-
-export default function AgentFeedback() {
-  const [rows, setRows] = useState<AgentFeedbackRow[]>([]);
+export default function AgentFeedbackPage() {
+  const [rows, setRows] = useState<FeedbackRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await listAgentFeedback(0, 50);
+      setRows(list);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Failed to load feedback.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let alive = true;
-
-    async function tryEndpoints() {
-      const candidates = [
-        "/api/v1/agent/feedback",
-        "/api/v1/feedback/agent", // fallback naming
-      ];
-
-      for (const url of candidates) {
-        try {
-          const data = await getJSON<AgentFeedbackRow[]>(url);
-          if (!alive) return;
-          if (Array.isArray(data)) {
-            setRows(data);
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // keep trying
-        }
-      }
-
-      if (alive) {
-        setRows([]);
-        setLoading(false);
-      }
-    }
-
-    tryEndpoints();
-    return () => { alive = false; };
+    load();
   }, []);
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Feedback About My Jobs</h1>
+  // Function to render stars based on rating
+  function renderStars(rating: number) {
+    return (
+      <div className="flex items-center gap-[2px]">
+        {Array.from({ length: rating }, (_, i) => (
+          <span key={i} className="text-amber-400 text-lg leading-none">★</span>
+        ))}
+        {Array.from({ length: 5 - rating }, (_, i) => (
+          <span key={i} className="text-slate-600 text-lg leading-none">★</span>
+        ))}
+      </div>
+    );
+  }
 
-      <div className="rounded-2xl overflow-hidden border border-slate-800">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-900/60 text-slate-300">
-            <tr>
-              <th className="text-left p-3">Request</th>
-              <th className="text-left p-3">Service</th>
-              <th className="text-left p-3">Rating</th>
-              <th className="text-left p-3">Comment</th>
-              <th className="text-left p-3">Author</th>
-              <th className="text-left p-3">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td className="p-3" colSpan={6}>Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td className="p-3 text-slate-400" colSpan={6}>No feedback for you yet</td></tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.id} className="border-t border-slate-800">
-                  <td className="p-3">#{r.requestId}</td>
-                  <td className="p-3">{r.serviceName || "-"}</td>
-                  <td className="p-3">{r.rating}</td>
-                  <td className="p-3">{r.comment || "-"}</td>
-                  <td className="p-3">{r.author || "-"}</td>
-                  <td className="p-3">{fmtDate(r.createdAt)}</td>
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-gray-100">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <h1 className="text-2xl font-bold tracking-wide text-white">
+            Customer Feedback
+          </h1>
+          <button
+            onClick={load}
+            className="rounded-lg bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-blue-700/50"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-3 rounded-lg bg-red-800/20 border border-red-600 px-4 py-2 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="overflow-x-auto rounded-2xl border border-slate-700 shadow-lg shadow-blue-900/20 backdrop-blur-sm">
+          <table className="w-full text-sm min-w-[500px]">
+            <thead className="bg-slate-800/70 border-b border-slate-700">
+              <tr className="text-gray-300">
+                <th className="text-left px-4 py-3 font-semibold">Request</th>
+                <th className="text-left px-4 py-3 font-semibold">Rating</th>
+                <th className="text-left px-4 py-3 font-semibold">Comment</th>
+                <th className="text-left px-4 py-3 font-semibold">Acknowledged</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                    Loading feedback…
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                    No feedback available for your requests.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="border-t border-slate-800 hover:bg-slate-800/50 transition-colors duration-150"
+                  >
+                    <td className="px-4 py-3 font-medium text-blue-400">{r.requestId}</td>
+                    <td className="px-4 py-3">{renderStars(r.rating)}</td>
+                    <td className="px-4 py-3 max-w-[60ch] text-gray-300">{r.comment}</td>
+                    <td className="px-4 py-3">
+                      {r.acknowledged ? (
+                        <span className="bg-green-600/20 text-green-400 px-2 py-1 rounded-md text-xs font-semibold">
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="bg-red-600/20 text-red-400 px-2 py-1 rounded-md text-xs font-semibold">
+                          No
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-10 text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} Autobridge. All rights reserved.
+        </div>
       </div>
     </div>
   );
 }
 
-function fmtDate(iso?: string | null) {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? "-" : d.toLocaleString();
-}
-  */
 
 
 
+
+/*
+//working code
 // src/pages/agent/AgentFeedback.tsx
 import { useEffect, useState } from "react";
 import { FeedbackRow, listAgentFeedback } from "@/api/feedbackAdmin";
@@ -166,3 +194,4 @@ export default function AgentFeedbackPage() {
   );
 }
 
+*/

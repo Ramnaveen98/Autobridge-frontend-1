@@ -1,189 +1,319 @@
-/*
-
 // src/layouts/PublicLayout.tsx
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useState, useRef } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 
 export default function PublicLayout() {
   const { token, role, logout } = useAuth();
   const nav = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
 
-  const navLink =
-    "opacity-90 hover:opacity-100 px-2 py-1 rounded transition-colors";
-  const navLinkActive = "text-blue-400";
+  const isAdmin = role === "ADMIN";
+  const isAgent = role === "AGENT";
+  const isUser = role === "USER" || (!isAdmin && !isAgent);
+
+  const navClass = ({ isActive }: { isActive: boolean }) =>
+    "block px-3 py-2 rounded-md hover:text-blue-400 " +
+    (isActive ? "font-semibold text-blue-400" : "text-gray-300");
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/70 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          //{/* Left: brand + nav }
-          <nav className="flex items-center gap-4">
-            {/* Brand now routes to Welcome }
-            <button
-              type="button"
-              onClick={() => nav("/welcome")}
-              className="font-semibold tracking-tight"
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-900 via-gray-950 to-black text-white">
+      {/* Header */}
+      <header className="border-b border-gray-800 sticky top-0 z-50 bg-gray-950/90 backdrop-blur-md">
+        <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8 py-3 flex items-center justify-between">
+          {/* Left group: Logo + main links */}
+          <div className="flex items-center gap-2 md:gap-4">
+            <Link
+              to="/"
+              className="font-bold text-2xl md:text-3xl text-white hover:text-blue-400 transition"
             >
               Autobridge
-            </button>
+            </Link>
 
-          //  {/* Public links }
-            <NavLink
-              to="/services"
-              className={({ isActive }) =>
-                `${navLink} ${isActive ? navLinkActive : ""}`
-              }
-            >
-              Services
-            </NavLink>
-            <NavLink
-              to="/vehicles"
-              className={({ isActive }) =>
-                `${navLink} ${isActive ? navLinkActive : ""}`
-              }
-            >
-              Vehicles
-            </NavLink>
+            {/* Desktop main nav beside brand (desktop only from lg) */}
+            <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-sm font-medium">
+              <NavLink to="/services" className={navClass}>
+                Services
+              </NavLink>
+              <NavLink to="/vehicles" className={navClass}>
+                Vehicles
+              </NavLink>
 
-            //{/* Authenticated-only nav items }
-            {token && (
-              <>
-                <NavLink
-                  to="/user/requests"
-                  className={({ isActive }) =>
-                    `${navLink} ${isActive ? navLinkActive : ""}`
-                  }
-                >
-                  My Requests
-                </NavLink>
-
-            //    {/* Admin section }
-                {role === "ADMIN" && (
-                  <>
-                    <NavLink
-                      to="/app/admin"
-                      className={({ isActive }) =>
-                        `${navLink} ${isActive ? navLinkActive : ""}`
-                      }
-                    >
+              {token && (
+                <>
+                  {/* Dashboard */}
+                  {isAdmin ? (
+                    <NavLink to="/app/admin" className={navClass}>
                       Admin
                     </NavLink>
-                    <NavLink
-                      to="/app/admin/services"
-                      className={({ isActive }) =>
-                        `${navLink} ${isActive ? navLinkActive : ""}`
-                      }
-                    >
-                      Services
+                  ) : isAgent ? (
+                    <NavLink to="/app/agent" className={navClass}>
+                      Agent
                     </NavLink>
-                    <NavLink
-                      to="/app/admin/feedback"
-                      className={({ isActive }) =>
-                        `${navLink} ${isActive ? navLinkActive : ""}`
-                      }
-                    >
+                  ) : (
+                    <NavLink to="/app/user" className={navClass}>
+                      My Dashboard
+                    </NavLink>
+                  )}
+
+                  {/* Admin Shortcuts */}
+                  {isAdmin && (
+                    <>
+                      <NavLink to="/app/admin/services" className={navClass}>
+                        Update Services
+                      </NavLink>
+                      <NavLink
+                        to="/app/admin/vehicles/photos"
+                        className={navClass}
+                      >
+                        Vehicle Photos
+                      </NavLink>
+                    </>
+                  )}
+
+                  {/* Agent Feedback */}
+                  {isAgent && (
+                    <NavLink to="/app/agent/feedback" className={navClass}>
                       Feedback
                     </NavLink>
-                  </>
-                )}
+                  )}
+                </>
+              )}
+            </nav>
+          </div>
 
-               // {/* Agent feedback (also visible to Admins) }
-                {(role === "AGENT" || role === "ADMIN") && (
-                  <NavLink
-                    to="/app/agent/feedback"
-                    className={({ isActive }) =>
-                      `${navLink} ${isActive ? navLinkActive : ""}`
-                    }
-                  >
-                    Agent Feedback
-                  </NavLink>
-                )}
-              </>
-            )}
-          </nav>
-
-       //   {/* Right: auth actions }
-          <div className="flex items-center gap-3">
+          {/* Right side buttons (Desktop only from lg) */}
+          <div className="hidden lg:flex items-center gap-3 text-sm">
             {!token ? (
               <>
-                <Link
-                  to="/login"
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
-                >
-                  Sign in
+                <Link to="/login" className="hover:text-blue-400">
+                  Login
                 </Link>
                 <Link
                   to="/signup"
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500"
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500"
                 >
-                  Sign up
+                  Signup
                 </Link>
               </>
             ) : (
               <>
-             //   {/* Profile link for all authenticated roles }
-              //  {/* App supports both /profile and /app/profile; using /profile }
-                <Link
-                  to="/profile"
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
-                >
+                <Link to="/profile" className="hover:text-blue-400">
                   Profile
                 </Link>
-
-             //   {/* Quick role shortcuts (keep your originals) }
-                {role === "ADMIN" && (
-                  <Link
-                    to="/app/admin"
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
-                  >
-                    Admin
-                  </Link>
-                )}
-                {role === "AGENT" && (
-                  <Link
-                    to="/app/agent"
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
-                  >
-                    Agent
-                  </Link>
-                )}
-                {role === "USER" && (
-                  <Link
-                    to="/app/user"
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
-                  >
-                    My Dashboard
-                  </Link>
-                )}
-
                 <button
-                  type="button"
                   onClick={() => {
                     logout();
-                    nav("/login");
+                    nav("/");
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700"
                 >
                   Logout
                 </button>
               </>
             )}
           </div>
+
+          {/* Hamburger (no highlight ever; styling-only change) */}
+          <button
+            ref={btnRef}
+            type="button"
+            aria-label="Toggle navigation"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            onPointerDown={(e) => e.preventDefault()} // prevent focus on mouse/touch
+            onMouseDown={(e) => e.preventDefault()}   // extra guard
+            onFocus={(e) => e.currentTarget.blur()}   // blur if anything focuses it
+            onClick={() => {
+              setMenuOpen(!menuOpen);
+              btnRef.current?.blur();
+            }}
+            className="lg:hidden relative inline-flex items-center justify-center w-11 h-11 rounded-lg
+                       border border-white/10 bg-white/5 backdrop-blur-sm shadow-sm
+                       hover:bg-white/10 active:scale-[0.98] transition
+                       outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+            style={{ WebkitTapHighlightColor: "transparent" }}
+          >
+            <span className="relative inline-block w-6 h-6 text-white">
+              {/* Hamburger */}
+              <svg
+                className={`absolute inset-0 transition-all duration-200 ease-out ${
+                  menuOpen ? "opacity-0 scale-90" : "opacity-100 scale-100"
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden={menuOpen}
+              >
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+              </svg>
+              {/* Close (X) */}
+              <svg
+                className={`absolute inset-0 transition-all duration-200 ease-out ${
+                  menuOpen ? "opacity-100 scale-100" : "opacity-0 scale-90"
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden={!menuOpen}
+              >
+                <path d="M6 6l12 12" />
+                <path d="M18 6l-12 12" />
+              </svg>
+            </span>
+          </button>
         </div>
+
+        {/* Collapsible menu for mobile & tablet (below lg) */}
+        {menuOpen && (
+          <div
+            id="mobile-nav"
+            className="lg:hidden bg-gray-900 border-t border-gray-800 text-center py-4 space-y-3 animate-fade-in"
+          >
+            <NavLink
+              to="/services"
+              onClick={() => setMenuOpen(false)}
+              className={navClass}
+            >
+              Services
+            </NavLink>
+            <NavLink
+              to="/vehicles"
+              onClick={() => setMenuOpen(false)}
+              className={navClass}
+            >
+              Vehicles
+            </NavLink>
+
+            {token && (
+              <>
+                {isAdmin ? (
+                  <NavLink
+                    to="/app/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className={navClass}
+                  >
+                    Admin
+                  </NavLink>
+                ) : isAgent ? (
+                  <NavLink
+                    to="/app/agent"
+                    onClick={() => setMenuOpen(false)}
+                    className={navClass}
+                  >
+                    Agent
+                  </NavLink>
+                ) : (
+                  <NavLink
+                    to="/app/user"
+                    onClick={() => setMenuOpen(false)}
+                    className={navClass}
+                  >
+                    My Dashboard
+                  </NavLink>
+                )}
+
+                {isAdmin && (
+                  <>
+                    <NavLink
+                      to="/app/admin/services"
+                      onClick={() => setMenuOpen(false)}
+                      className={navClass}
+                    >
+                      Update Services
+                    </NavLink>
+                    <NavLink
+                      to="/app/admin/vehicles/photos"
+                      onClick={() => setMenuOpen(false)}
+                      className={navClass}
+                    >
+                      Vehicle Photos
+                    </NavLink>
+                  </>
+                )}
+
+                {isAgent && (
+                  <NavLink
+                    to="/app/agent/feedback"
+                    onClick={() => setMenuOpen(false)}
+                    className={navClass}
+                  >
+                    Feedback
+                  </NavLink>
+                )}
+              </>
+            )}
+
+            <div className="border-t border-gray-800 mx-6 my-3" />
+
+            {!token ? (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setMenuOpen(false)}
+                  className="block text-gray-300 hover:text-blue-400"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => setMenuOpen(false)}
+                  className="block mx-auto w-fit bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-500"
+                >
+                  Signup
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="block text-gray-300 hover:text-blue-400"
+                >
+                  Profile
+                </Link>
+                <button
+                  onClick={() => {
+                    logout();
+                    nav("/");
+                    setMenuOpen(false);
+                  }}
+                  className="block mx-auto w-fit bg-zinc-800 text-white px-4 py-1.5 rounded-lg hover:bg-zinc-700"
+                >
+                  Logout
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </header>
 
-      <main className="max-w-6xl mx-auto px-4">
+      {/* Main page content */}
+      <main className="flex-1">
         <Outlet />
       </main>
 
-      <footer className="mt-12 py-8 text-center text-sm opacity-60">
+      {/* Footer */}
+      <footer className="py-10 text-center text-xs text-gray-500 border-t border-gray-800">
         © {new Date().getFullYear()} Autobridge
       </footer>
     </div>
   );
 }
 
-*/
+
+
+/*
+//Working code
 
 // src/layouts/PublicLayout.tsx
 // src/layouts/PublicLayout.tsx
@@ -219,7 +349,7 @@ export default function PublicLayout() {
 
             {token && (
               <>
-                {/* ---------- DASHBOARD ENTRY (exactly one) ---------- */}
+                // ---------- DASHBOARD ENTRY (exactly one) ----------
                 {isAdmin ? (
                   <NavLink to="/app/admin" className={navClass}>
                     Admin
@@ -234,7 +364,7 @@ export default function PublicLayout() {
                   </NavLink>
                 )}
 
-                {/* ---------- Admin-only shortcuts ---------- */}
+                // ---------- Admin-only shortcuts ---------- 
                 {isAdmin && (
                   <>
                     <NavLink to="/app/admin/services" className={navClass}>
@@ -246,7 +376,7 @@ export default function PublicLayout() {
                   </>
                 )}
 
-                {/* ---------- Agent/Admin feedback shortcut ---------- */}
+                // ---------- Agent/Admin feedback shortcut ---------- 
                 {(isAgent) && (
                   <NavLink to="/app/agent/feedback" className={navClass}>
                     Feedback
@@ -299,3 +429,5 @@ export default function PublicLayout() {
     </div>
   );
 }
+
+*/

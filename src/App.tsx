@@ -4,6 +4,9 @@ import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-route
 import PublicLayout from "@/layouts/PublicLayout";
 import { useAuth } from "@/providers/AuthProvider";
 import AdminRequests from "@/pages/admin/AdminRequests";
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
+import ThankYouPage from "@/pages/feedback/ThankYouPage";
+
 
 /** ---------- Public / top-level pages ---------- */
 const Login = lazy(() => import("@/pages/Login"));
@@ -168,6 +171,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+          <Route path="/thank-you" element={<ThankYouPage />} />
           <Route
             path="app/user/requests/:id"
             element={
@@ -194,6 +198,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="app/agent"
             element={

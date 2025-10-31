@@ -1,183 +1,14 @@
-/*
 // src/pages/Signup.tsx
-import { FormEvent, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { authApi } from "@/services/auth";
-
-type AccountType = "USER" | "ADMIN" | "AGENT";
-
-export default function Signup() {
-  const nav = useNavigate();
-
-  const [firstName, setFirst] = useState("");
-  const [lastName, setLast] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPw] = useState("");
-  const [accountType, setType] = useState<AccountType>("USER");
-  const [inviteCode, setInvite] = useState("");
-
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setErr(null);
-    setBusy(true);
-    try {
-      await authApi.signup({
-        firstName,
-        lastName,
-        email,
-        password,
-        phone: phone || undefined,
-        accountType,           // backend expects: USER | ADMIN | AGENT
-        inviteCode: inviteCode || undefined // only checked for ADMIN/AGENT
-      });
-
-      // signup returns 201 and NO token. send user to login.
-      nav("/login", { replace: true, state: { msg: "Sign up successful. Please sign in." } });
-    } catch (e: any) {
-      // map common HTTP errors to friendly text
-      const msg =
-        e?.response?.status === 409
-          ? "An account with this email already exists."
-          : e?.response?.status === 403
-          ? "Invalid or missing invite code for selected account type."
-          : "Sign up failed. Please try again.";
-      setErr(msg);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const needsInvite = accountType === "ADMIN" || accountType === "AGENT";
-
-  return (
-    <div className="min-h-[70vh] grid place-items-center">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-lg p-6 rounded-2xl bg-slate-900/60 border border-slate-800"
-      >
-        <h1 className="text-2xl font-semibold mb-1">Create your account</h1>
-        <p className="text-sm text-slate-400 mb-6">
-          Already have an account?{" "}
-          <Link to="/login" className="text-blue-400 hover:text-blue-300 underline">
-            Sign in
-          </Link>
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-sm text-slate-300">First name</span>
-            <input
-              className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2"
-              value={firstName}
-              onChange={(e) => setFirst(e.target.value)}
-              required
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm text-slate-300">Last name</span>
-            <input
-              className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2"
-              value={lastName}
-              onChange={(e) => setLast(e.target.value)}
-              required
-            />
-          </label>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-sm text-slate-300">Email</span>
-            <input
-              type="email"
-              className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value.toLowerCase())}
-              required
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm text-slate-300">Phone (optional)</span>
-            <input
-              className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 555 555 5555"
-            />
-          </label>
-        </div>
-
-        <div className="mt-3">
-          <label className="block">
-            <span className="text-sm text-slate-300">Password</span>
-            <input
-              type="password"
-              className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2"
-              value={password}
-              onChange={(e) => setPw(e.target.value)}
-              required
-              minLength={6}
-            />
-          </label>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-sm text-slate-300">Account type</span>
-            <select
-              className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2"
-              value={accountType}
-              onChange={(e) => setType(e.target.value as AccountType)}
-            >
-              <option value="USER">User</option>
-              <option value="AGENT">Agent</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-          </label>
-
-          <label className={`block ${needsInvite ? "" : "opacity-60"}`}>
-            <span className="text-sm text-slate-300">
-              Invite code {needsInvite ? "" : "(not required)"}
-            </span>
-            <input
-              className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 disabled:opacity-60"
-              value={inviteCode}
-              onChange={(e) => setInvite(e.target.value)}
-              disabled={!needsInvite}
-              placeholder={needsInvite ? "Enter invite code" : "N/A"}
-              required={needsInvite}
-            />
-          </label>
-        </div>
-
-        {err && <p className="mt-4 text-red-400 text-sm">{err}</p>}
-
-        <button
-          type="submit"
-          disabled={busy}
-          className="mt-5 w-full rounded-lg px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
-        >
-          {busy ? "Creating account..." : "Create account"}
-        </button>
-      </form>
-    </div>
-  );
-}
-  */
-
-
-// src/pages/Signup.tsx
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { authApi } from "@/services/auth";
 
 type Role = "USER" | "AGENT" | "ADMIN";
 
 export default function Signup() {
   const nav = useNavigate();
+
+  // form state
   const [role, setRole] = useState<Role>("USER");
   const [firstName, setFirst] = useState("");
   const [lastName, setLast] = useState("");
@@ -185,19 +16,53 @@ export default function Signup() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInvite] = useState("");
+
+  // ui state
+  const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
+  // simple client validations (kept lightweight)
+  const emailOk = /\S+@\S+\.\S+/.test(email.trim());
+  const phoneOk = phone.trim() === "" || /^[0-9()\-\s+]{7,20}$/.test(phone.trim());
+
+  const pwRules = useMemo(() => {
+    const v = password;
+    return {
+      len: v.length >= 8,
+      up: /[A-Z]/.test(v),
+      low: /[a-z]/.test(v),
+      num: /\d/.test(v),
+      sym: /[^A-Za-z0-9]/.test(v),
+    };
+  }, [password]);
+  const pwOk = pwRules.len && pwRules.up && pwRules.low && pwRules.num && pwRules.sym;
+
+  const inviteNeeded = role === "ADMIN" || role === "AGENT";
+  const canSubmit =
+    firstName.trim() &&
+    lastName.trim() &&
+    emailOk &&
+    phoneOk &&
+    pwOk &&
+    (!inviteNeeded || inviteCode.trim());
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
-    setBusy(true); setErr(null); setOk(null);
-
+    if (busy || !canSubmit) return;
+    setBusy(true);
+    setErr(null);
+    setOk(null);
     try {
       await authApi.signup({
-        firstName, lastName, email, password, phone,
-        accountType: role, inviteCode: inviteCode || undefined
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim() || undefined,
+        accountType: role,
+        inviteCode: inviteCode.trim() || undefined,
       });
       setOk("Sign up successful. Please log in.");
       setTimeout(() => nav("/login", { replace: true }), 700);
@@ -211,68 +76,165 @@ export default function Signup() {
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">Create an account</h1>
+    <div className="px-4 sm:px-6 py-10">
+      {/* match Login page width/centering */}
+      <div className="mx-auto w-full max-w-md">
+        <h1 className="text-2xl font-semibold mb-4">Create an account</h1>
 
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <form onSubmit={submit} className="space-y-4">
+          {/* First name */}
           <label className="block">
             <div className="text-sm mb-1">First name</div>
-            <input className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
-                   value={firstName} onChange={e => setFirst(e.target.value)} />
+            <input
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
+              value={firstName}
+              onChange={(e) => setFirst(e.target.value)}
+              required
+            />
           </label>
+
+          {/* Last name */}
           <label className="block">
             <div className="text-sm mb-1">Last name</div>
-            <input className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
-                   value={lastName} onChange={e => setLast(e.target.value)} />
+            <input
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
+              value={lastName}
+              onChange={(e) => setLast(e.target.value)}
+              required
+            />
           </label>
-        </div>
 
-        <label className="block">
-          <div className="text-sm mb-1">Email</div>
-          <input type="email" className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
-                 value={email} onChange={e => setEmail(e.target.value)} />
-        </label>
+          {/* Email */}
+          <label className="block">
+            <div className="text-sm mb-1">Email</div>
+            <input
+              type="email"
+              className={`w-full rounded-lg bg-slate-800 border px-3 py-2 outline-none ${
+                email && !emailOk ? "border-red-600" : "border-slate-700"
+              }`}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              aria-invalid={!!email && !emailOk}
+            />
+            {!emailOk && email.length > 0 && (
+              <p className="mt-1 text-xs text-red-400">Enter a valid email address.</p>
+            )}
+          </label>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Phone */}
           <label className="block">
             <div className="text-sm mb-1">Phone</div>
-            <input className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
-                   value={phone} onChange={e => setPhone(e.target.value)} />
+            <input
+              placeholder="(###) ###-####"
+              className={`w-full rounded-lg bg-slate-800 border px-3 py-2 outline-none ${
+                phone && !phoneOk ? "border-red-600" : "border-slate-700"
+              }`}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              aria-invalid={!!phone && !phoneOk}
+            />
+            {!phoneOk && phone.length > 0 && (
+              <p className="mt-1 text-xs text-red-400">Use digits, spaces, dashes, or ( ).</p>
+            )}
           </label>
+
+          {/* Password + toggle */}
           <label className="block">
             <div className="text-sm mb-1">Password</div>
-            <input type="password" className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
-                   value={password} onChange={e => setPassword(e.target.value)} />
+            <div className="relative">
+              <input
+                type={showPw ? "text" : "password"}
+                className={`w-full rounded-lg bg-slate-800 border px-3 py-2 pr-16 outline-none ${
+                  password && !pwOk ? "border-red-600" : "border-slate-700"
+                }`}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="8+ characters"
+                required
+                aria-invalid={!!password && !pwOk}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-sm bg-slate-700 hover:bg-slate-600"
+              >
+                {showPw ? "Hide" : "Show"}
+              </button>
+            </div>
+
+            {/* Subtle checklist; small & wraps nicely on mobile */}
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-300">
+              <Rule ok={pwRules.len} text="At least 8 characters" />
+              <Rule ok={pwRules.up} text="Contains an uppercase letter (A–Z)" />
+              <Rule ok={pwRules.low} text="Contains a lowercase letter (a–z)" />
+              <Rule ok={pwRules.num} text="Contains a number (0–9)" />
+              <Rule ok={pwRules.sym} text="Contains a symbol (!@#$…)" />
+            </div>
           </label>
-        </div>
 
-        <label className="block">
-          <div className="text-sm mb-1">Account type</div>
-          <select className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
-                  value={role} onChange={e => setRole(e.target.value as Role)}>
-            <option value="USER">User</option>
-            <option value="AGENT">Agent</option>
-            <option value="ADMIN">Admin</option>
-          </select>
-        </label>
-
-        {(role === "ADMIN" || role === "AGENT") && (
+          {/* Role */}
           <label className="block">
-            <div className="text-sm mb-1">Invite code (required for {role.toLowerCase()})</div>
-            <input className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
-                   value={inviteCode} onChange={e => setInvite(e.target.value)} />
+            <div className="text-sm mb-1">Account type</div>
+            <select
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+            >
+              <option value="USER">User</option>
+              <option value="AGENT">Agent</option>
+              <option value="ADMIN">Admin</option>
+            </select>
           </label>
-        )}
 
-        {err && <div className="text-red-400 text-sm">{err}</div>}
-        {ok && <div className="text-emerald-400 text-sm">{ok}</div>}
+          {/* Invite code (conditional) */}
+          {inviteNeeded && (
+            <label className="block">
+              <div className="text-sm mb-1">
+                Invite code <span className="text-slate-400">(required for {role.toLowerCase()})</span>
+              </div>
+              <input
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
+                value={inviteCode}
+                onChange={(e) => setInvite(e.target.value)}
+                required={inviteNeeded}
+              />
+            </label>
+          )}
 
-        <button disabled={busy}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50">
-          {busy ? "Creating…" : "Create account"}
-        </button>
-      </form>
+          {err && <div className="text-red-400 text-sm">{err}</div>}
+          {ok && <div className="text-emerald-400 text-sm">{ok}</div>}
+
+          <button
+            disabled={busy || !canSubmit}
+            className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
+          >
+            {busy ? "Creating…" : "Create account"}
+          </button>
+        </form>
+
+        {/* footer links — mirror Login page placement/size */}
+        <div className="mt-4 text-sm text-slate-300">
+          Already have an account?{" "}
+          <Link to="/login" className="text-blue-400 hover:underline">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Rule({ ok, text }: { ok: boolean; text: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={`inline-block h-2 w-2 rounded-full ${
+          ok ? "bg-emerald-400" : "bg-slate-600"
+        }`}
+        aria-hidden
+      />
+      <span className={ok ? "text-emerald-300" : ""}>{text}</span>
     </div>
   );
 }

@@ -25,7 +25,6 @@ export default function AdminServices() {
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-
   const [form, setForm] = useState<Omit<ServiceRow, "id">>(emptyForm);
   const [editId, setEditId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -111,10 +110,16 @@ export default function AdminServices() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Manage Services</h1>
+    <div className="space-y-6 px-3 sm:px-6 lg:px-8">
+      <h1 className="text-xl sm:text-2xl font-semibold text-center sm:text-left">
+        Manage Services
+      </h1>
 
-      <form onSubmit={save} className="rounded-2xl border border-slate-800 p-4 grid gap-4 md:grid-cols-2">
+      {/* Form Section */}
+      <form
+        onSubmit={save}
+        className="rounded-2xl border border-slate-800 p-4 sm:p-6 grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2"
+      >
         <label className="block">
           <div className="text-sm mb-1">Slug</div>
           <input
@@ -124,6 +129,7 @@ export default function AdminServices() {
             required
           />
         </label>
+
         <label className="block">
           <div className="text-sm mb-1">Name</div>
           <input
@@ -133,15 +139,17 @@ export default function AdminServices() {
             required
           />
         </label>
+
         <label className="block md:col-span-2">
           <div className="text-sm mb-1">Description</div>
           <textarea
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none"
+            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none resize-none"
             rows={3}
             value={form.description ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
         </label>
+
         <label className="block">
           <div className="text-sm mb-1">Base Price</div>
           <input
@@ -152,6 +160,7 @@ export default function AdminServices() {
             onChange={(e) => setForm((f) => ({ ...f, basePrice: Number(e.target.value) }))}
           />
         </label>
+
         <label className="block">
           <div className="text-sm mb-1">Duration (minutes)</div>
           <input
@@ -161,6 +170,7 @@ export default function AdminServices() {
             onChange={(e) => setForm((f) => ({ ...f, durationMinutes: Number(e.target.value) }))}
           />
         </label>
+
         <label className="block">
           <div className="text-sm mb-1">Active</div>
           <select
@@ -173,29 +183,32 @@ export default function AdminServices() {
           </select>
         </label>
 
-        <div className="md:col-span-2 flex gap-3">
+        <div className="md:col-span-2 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <button
             type="submit"
             disabled={saving}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
           >
             {editId == null ? (saving ? "Creating…" : "Create") : saving ? "Updating…" : "Update"}
           </button>
           {editId != null && (
             <button
               type="button"
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700"
+              className="w-full sm:w-auto px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700"
               onClick={startCreate}
             >
               Cancel edit
             </button>
           )}
-          {msg && <div className="self-center text-sm text-slate-300">{msg}</div>}
+          {msg && (
+            <div className="text-sm text-slate-300 sm:ml-2 break-words">{msg}</div>
+          )}
         </div>
       </form>
 
-      <div className="rounded-2xl overflow-hidden border border-slate-800">
-        <table className="w-full text-sm">
+      {/* Table Section */}
+      <div className="rounded-2xl border border-slate-800 overflow-x-auto">
+        <table className="w-full min-w-[600px] text-sm">
           <thead className="bg-slate-900/60 text-slate-300">
             <tr>
               <th className="text-left p-3">Name</th>
@@ -208,28 +221,43 @@ export default function AdminServices() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="p-3" colSpan={6}>Loading…</td></tr>
+              <tr>
+                <td className="p-3" colSpan={6}>
+                  Loading…
+                </td>
+              </tr>
             ) : err ? (
-              <tr><td className="p-3 text-red-400" colSpan={6}>{err}</td></tr>
+              <tr>
+                <td className="p-3 text-red-400" colSpan={6}>
+                  {err}
+                </td>
+              </tr>
             ) : rows.length === 0 ? (
-              <tr><td className="p-3 text-slate-400" colSpan={6}>No services</td></tr>
+              <tr>
+                <td className="p-3 text-slate-400" colSpan={6}>
+                  No services
+                </td>
+              </tr>
             ) : (
               rows.map((r) => (
-                <tr key={r.id} className="border-t border-slate-800">
+                <tr
+                  key={r.id}
+                  className="border-t border-slate-800 hover:bg-slate-800/40 transition-colors"
+                >
                   <td className="p-3">{r.name}</td>
                   <td className="p-3">{r.slug}</td>
                   <td className="p-3">{fmtCurrency(r.basePrice)}</td>
                   <td className="p-3">{r.durationMinutes}m</td>
                   <td className="p-3">{r.active ? "Yes" : "No"}</td>
-                  <td className="p-3 space-x-2">
+                  <td className="p-3 flex flex-wrap gap-2">
                     <button
-                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700"
+                      className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700"
                       onClick={() => startEdit(r)}
                     >
                       Edit
                     </button>
                     <button
-                      className="px-2 py-1 rounded bg-red-600 hover:bg-red-500"
+                      className="px-3 py-1 rounded bg-red-600 hover:bg-red-500"
                       onClick={() => remove(r.id)}
                     >
                       Delete
