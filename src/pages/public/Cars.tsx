@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { catalogApi, Vehicle } from "@/services/catalog";
+//import { catalogApi, Vehicle } from "@/services/catalog";
+import { catalogApi, VehicleDto as Vehicle } from "@/services/catalog";
+
 
 export default function Cars() {
   const [items, setItems] = useState<Vehicle[] | null>(null);

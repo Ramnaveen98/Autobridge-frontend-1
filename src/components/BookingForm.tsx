@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getJSON, postJSON } from "@/services/client";
 
-type ServiceSlim = { id: number; name: string; slug: string };
+type ServiceSlim = { id: number; name: string; slug?: string };
 
 type VehicleSummary = {
   id: number;

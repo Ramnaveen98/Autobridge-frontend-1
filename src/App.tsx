@@ -6,6 +6,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import AdminRequests from "@/pages/admin/AdminRequests";
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import ThankYouPage from "@/pages/feedback/ThankYouPage";
+import React from "react";
 
 
 /** ---------- Public / top-level pages ---------- */
@@ -61,7 +62,7 @@ function RequireAuth({
   children
 }: {
   roles?: Array<"USER" | "ADMIN" | "AGENT">;
-  children: JSX.Element;
+  children: React.ReactNode;
 }) {
   const { token, role } = useAuth();
   const { pathname } = useLocation();

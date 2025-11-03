@@ -1,3 +1,4 @@
+// src/providers/AuthProvider.tsx
 import {
   createContext,
   PropsWithChildren,
@@ -9,18 +10,39 @@ import {
   useState,
 } from "react";
 import { authApi } from "@/services/auth";
-import { registerTokenGetter, registerUnauthorizedHandler } from "@/services/client";
+import {
+  registerTokenGetter,
+  registerUnauthorizedHandler,
+  postJSON,
+} from "@/services/client";
 
 type Role = "USER" | "ADMIN" | "AGENT";
 type MaybeRole = Role | null;
+
+type SignupUserPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+};
+
+type SignupAgentPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phone?: string;
+};
 
 type AuthContextShape = {
   token: string | null;
   role: MaybeRole;
   email: string | null;
-  isAuthReady: boolean; // ✅ NEW
+  isAuthReady: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  signupUser: (p: SignupUserPayload) => Promise<void>;
+  signupAgent: (p: SignupAgentPayload) => Promise<void>;
 };
 
 const Ctx = createContext<AuthContextShape>({
@@ -30,6 +52,8 @@ const Ctx = createContext<AuthContextShape>({
   isAuthReady: false,
   async login() {},
   logout() {},
+  async signupUser() {},
+  async signupAgent() {},
 });
 
 export function useAuth() {
@@ -39,7 +63,9 @@ export function useAuth() {
 const STORAGE_KEY = "autobridge.auth";
 const TOKEN_KEY = "autobridge.token";
 const AUTH_EVENT_KEY = "autobridge.auth.event";
-const EXP_SKEW_MS = 5000; // auto-logout slightly before exp
+
+// auto-logout slightly before exp to avoid race conditions
+const EXP_SKEW_MS = 5000;
 
 function base64UrlDecode(input: string) {
   const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -71,7 +97,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [token, setToken] = useState<string | null>(null);
   const [role, setRole] = useState<MaybeRole>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false); // ✅ NEW FLAG
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   // Restore from localStorage on mount
   useEffect(() => {
@@ -90,8 +116,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } catch {
       // ignore malformed storage
     }
-
-    // ✅ mark ready after short delay to prevent redirect flicker
+    // mark ready after a short delay to prevent redirect flicker
     const timer = setTimeout(() => setIsAuthReady(true), 200);
     return () => clearTimeout(timer);
   }, []);
@@ -173,6 +198,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
     scheduleAutoLogout(resp.token);
   }
 
+  // ✅ Robust sign-up: try api methods if present; fallback to POSTing to common endpoints
+  const signupUser = useCallback(async (p: SignupUserPayload) => {
+    const anyApi = authApi as any;
+    if (typeof anyApi?.signupUser === "function") {
+      await anyApi.signupUser(p);
+      return;
+    }
+    if (typeof anyApi?.signup === "function") {
+      await anyApi.signup({ ...p, role: "USER" });
+      return;
+    }
+    await postJSON<void>("/api/v1/auth/signup-user", p);
+  }, []);
+
+  const signupAgent = useCallback(async (p: SignupAgentPayload) => {
+    const anyApi = authApi as any;
+    if (typeof anyApi?.signupAgent === "function") {
+      await anyApi.signupAgent(p);
+      return;
+    }
+    if (typeof anyApi?.signup === "function") {
+      await anyApi.signup({ ...p, role: "AGENT" });
+      return;
+    }
+    await postJSON<void>("/api/v1/auth/signup-agent", p);
+  }, []);
+
   // schedule on mount (after storage restore) and on every token change
   useEffect(() => {
     if (isAuthReady) scheduleAutoLogout(token);
@@ -227,8 +279,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [clearTimer, scheduleAutoLogout]);
 
   const value = useMemo(
-    () => ({ token, role, email, login, logout, isAuthReady }), // ✅ added flag
-    [token, role, email, login, logout, isAuthReady]
+    () => ({
+      token,
+      role,
+      email,
+      login,
+      logout,
+      isAuthReady,
+      signupUser,
+      signupAgent,
+    }),
+    [token, role, email, login, logout, isAuthReady, signupUser, signupAgent]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

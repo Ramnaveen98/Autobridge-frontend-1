@@ -1,12 +1,18 @@
 // src/services/client.ts
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 
+import type { AxiosRequestHeaders } from "axios";
+
+
 /**
  * Base URL for the backend (no trailing slash).
  * Configure via .env -> VITE_API_BASE=http://localhost:8080
  */
 export const API_BASE =
-  (import.meta.env.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+(import.meta.env.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+ 
+
+
 
 /** Primary Axios instance */
 export const api: AxiosInstance = axios.create({
@@ -63,10 +69,10 @@ api.interceptors.request.use((config) => {
   if (!isPublicGet) {
     const token = getToken();
     if (token) {
-      config.headers = {
-        ...(config.headers ?? {}),
-        Authorization: `Bearer ${token}`,
-      };
+      config.headers = (config.headers ?? {}) as AxiosRequestHeaders;
+  if (token) {
+  (config.headers as AxiosRequestHeaders).Authorization = `Bearer ${token}`;
+  }
     }
   }
 

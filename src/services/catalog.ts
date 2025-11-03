@@ -2,10 +2,11 @@ import { getFirstOk } from "./client";
 
 export type ServiceDto = {
   id: number;
-  slug: string;
+  slug?: string;
   name: string;
-  durationMinutes: number;
-  basePrice: number;
+  description?:string;
+  durationMin?: number;
+  price: number | string;
 };
 
 export type VehicleDto = {

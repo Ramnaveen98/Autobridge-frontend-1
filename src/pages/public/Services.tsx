@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
-import { catalogApi, Service } from "@/services/catalog";
+// src/pages/public/Services.tsx
+import React, { useEffect, useState } from "react";
+import { catalogApi, ServiceDto as Service } from "@/services/catalog";
 import BookingForm from "@/components/BookingForm";
+
+// simple fallback slug generator if backend doesn't provide one
+function toSlug(name: string | undefined): string | undefined {
+  if (!name) return undefined;
+  return name.toLowerCase().trim().replace(/\s+/g, "-");
+}
 
 export default function Services() {
   const [items, setItems] = useState<Service[] | null>(null);
@@ -25,12 +32,15 @@ export default function Services() {
         }
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Helper to open modal with a specific service
   function openBooking(s: Service) {
-    setActiveService({ id: s.id, name: s.name, slug: (s as any).slug });
+    const slug = (s as any).slug ?? toSlug(s.name);
+    setActiveService({ id: s.id, name: s.name, slug });
     setOpen(true);
   }
 
@@ -60,27 +70,47 @@ export default function Services() {
         )}
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items?.map((s) => (
-            <article
-              key={s.id}
-              className="rounded-2xl bg-slate-800/60 backdrop-blur p-5 shadow-md border border-white/5"
-            >
-              <header className="text-lg font-medium">{s.name}</header>
-              {s.description && (
-                <p className="text-sm opacity-80 mt-1 line-clamp-3">{s.description}</p>
-              )}
-              <div className="mt-4 text-sm opacity-90">Duration: {s.durationMin} min</div>
-              <div className="mt-1 font-semibold">${s.price?.toFixed(2)}</div>
-              <div className="mt-4">
-                <button
-                  className="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-sm"
-                  onClick={() => openBooking(s)}
-                >
-                  Book this service
-                </button>
-              </div>
-            </article>
-          ))}
+          {items?.map((s) => {
+            const hasDescription = (s as any).description != null && String((s as any).description).length > 0;
+            const duration = (s as any).durationMin as number | undefined;
+            const rawPrice = (s as any).price as number | string | undefined;
+            const priceNumber =
+              typeof rawPrice === "number"
+                ? rawPrice
+                : typeof rawPrice === "string"
+                ? Number(rawPrice)
+                : undefined;
+
+            return (
+              <article
+                key={s.id}
+                className="rounded-2xl bg-slate-800/60 backdrop-blur p-5 shadow-md border border-white/5"
+              >
+                <header className="text-lg font-medium">{s.name}</header>
+
+                {hasDescription && (
+                  <p className="text-sm opacity-80 mt-1 line-clamp-3">{String((s as any).description)}</p>
+                )}
+
+                {duration != null && (
+                  <div className="mt-4 text-sm opacity-90">Duration: {duration} min</div>
+                )}
+
+                {priceNumber != null && !Number.isNaN(priceNumber) && (
+                  <div className="mt-1 font-semibold">${priceNumber.toFixed(2)}</div>
+                )}
+
+                <div className="mt-4">
+                  <button
+                    className="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-sm"
+                    onClick={() => openBooking(s)}
+                  >
+                    Book this service
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
 

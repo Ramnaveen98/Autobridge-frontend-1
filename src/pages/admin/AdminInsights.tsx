@@ -1,6 +1,7 @@
 // src/pages/admin/AdminInsights.tsx
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/services/client";
+
 import {
   Bar,
   BarChart,
@@ -13,7 +14,6 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  type TooltipProps,
 } from "recharts";
 
 /* --------------------------------------------------------------------------------
@@ -45,14 +45,13 @@ function ActiveBar(props: any) {
   );
 }
 
-/* Custom tooltip used by BOTH charts so text is always white and readable on dark */
-function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
+/* Custom tooltip used by BOTH charts; relaxed typing to avoid Recharts TS friction */
+function ChartTooltip(props: any) {
+  const { active, payload, label } = props;
   if (!active || !payload || payload.length === 0) return null;
 
   const p = payload[0];
-  const name =
-    (p?.name as string) ??
-    (typeof label === "string" ? label : "Count");
+  const name = (p?.name as string) ?? (typeof label === "string" ? label : "Count");
   const value = (p?.value ?? "") as number | string;
 
   return (
@@ -63,7 +62,7 @@ function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) 
         borderRadius: 12,
         padding: "8px 10px",
         boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
-        color: "#fff", // force white text
+        color: "#fff",
         minWidth: 150,
       }}
     >
@@ -145,21 +144,9 @@ export default function AdminInsights() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
-        <StatCard
-          title="Completed"
-          value={completed}
-          desc="Finished and closed"
-        />
-        <StatCard
-          title="In-Progress"
-          value={inProgress}
-          desc="Pending / Assigned / In-progress"
-        />
-        <StatCard
-          title="Cancelled"
-          value={cancelled}
-          desc="Cancelled by any party"
-        />
+        <StatCard title="Completed" value={completed} desc="Finished and closed" />
+        <StatCard title="In-Progress" value={inProgress} desc="Pending / Assigned / In-progress" />
+        <StatCard title="Cancelled" value={cancelled} desc="Cancelled by any party" />
       </div>
 
       {/* Charts: side-by-side on desktop, stacked on small screens */}
@@ -184,7 +171,7 @@ export default function AdminInsights() {
                 <Bar
                   dataKey="value"
                   name="Count"
-                  barSize={36}                 // thinner bar
+                  barSize={36}
                   radius={[8, 8, 0, 0]}
                   activeBar={<ActiveBar />}
                 >
@@ -221,7 +208,7 @@ export default function AdminInsights() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius={0}        // solid pie
+                  innerRadius={0}
                   outerRadius="80%"
                   paddingAngle={2}
                   stroke="#18191bff"

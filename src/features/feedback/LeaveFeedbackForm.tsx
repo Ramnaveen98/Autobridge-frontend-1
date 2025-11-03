@@ -1,6 +1,6 @@
 // src/features/feedback/LeaveFeedbackForm.tsx
 import { useState } from "react";
-import { leaveFeedback } from "@/api/feedback";
+import { feedbackApi } from "@/api/feedback";
 
 type Props = {
   requestId: number; // must be a valid numeric ID
@@ -39,7 +39,8 @@ export default function LeaveFeedbackForm({ requestId, requestStatus, onDone }: 
 
     setSaving(true);
     try {
-      await leaveFeedback(requestId, { rating, comment });
+      // ✅ use API wrapper instead of the missing named export
+      await feedbackApi.leave(requestId, { rating, comment });
       setComment("");
       setRating(5);
       onDone?.();
