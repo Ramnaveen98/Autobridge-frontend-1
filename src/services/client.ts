@@ -1,20 +1,37 @@
 // src/services/client.ts
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
-
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+} from "axios";
 import type { AxiosRequestHeaders } from "axios";
 
+/* -----------------------------------------------------------------------------
+   API base URL resolution (no trailing slash)
+   Priority:
+   1) window.__API_BASE__              (runtime override without rebuild)
+   2) import.meta.env.VITE_API_BASE    (Vite build-time env)
+   3) <meta name="autobridge-api-base" content="https://..."> (index.html)
+   4) Cloud Run default (edit if you prefer another fallback)
+----------------------------------------------------------------------------- */
+const metaApiBase =
+  typeof document !== "undefined"
+    ? document
+        .querySelector<HTMLMetaElement>('meta[name="autobridge-api-base"]')
+        ?.getAttribute("content")
+    : undefined;
 
-/**
- * Base URL for the backend (no trailing slash).
- * Configure via .env -> VITE_API_BASE=http://localhost:8080
- */
-export const API_BASE =
-(import.meta.env.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
- 
+const DEFAULT_API_BASE =
+  (typeof window !== "undefined" && (window as any).__API_BASE__) ||
+  (import.meta as any)?.env?.VITE_API_BASE ||
+  metaApiBase ||
+  "https://javaspringboot-project-tpy3lssbpa-uc.a.run.app";
 
+export const API_BASE = String(DEFAULT_API_BASE).replace(/\/$/, "");
 
-
-/** Primary Axios instance */
+/* -----------------------------------------------------------------------------
+   Axios instance
+----------------------------------------------------------------------------- */
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE,
   withCredentials: false,
@@ -24,28 +41,32 @@ export const api: AxiosInstance = axios.create({
   },
 });
 
-/** Auth token provider (wired up by AuthProvider). */
-let getToken: () => string | null =
-  () => localStorage.getItem("autobridge.token") || null;
+/* -----------------------------------------------------------------------------
+   Auth token plumbing
+----------------------------------------------------------------------------- */
+let getToken: () => string | null = () =>
+  (typeof window !== "undefined"
+    ? localStorage.getItem("autobridge.token")
+    : null) || null;
 
-/** Allow AuthProvider to register a getter for the current JWT. */
 export function registerTokenGetter(fn: () => string | null) {
   getToken = fn;
 }
-
-/** (Optional alias to match other code snippets) */
+// Optional alias used elsewhere
 export const registerTokenProvider = registerTokenGetter;
 
-/** Public GET allowlist (no auth header attached) */
+/* -----------------------------------------------------------------------------
+   Public GET allowlist (no Authorization header)
+----------------------------------------------------------------------------- */
 const PUBLIC_GET_ALLOWLIST: RegExp[] = [
   // services catalog
   /^\/api\/v1\/services\/public(?:\/.*)?$/i,
 
-  // vehicles (your project exposes both; we allow either)
+  // vehicles (exposes both patterns)
   /^\/api\/v1\/vehicles\/public(?:\/.*)?$/i,
   /^\/api\/v1\/public\/vehicles(?:\/.*)?$/i,
 
-  // image proxy and other public endpoints
+  // other public endpoints
   /^\/api\/v1\/public(?:\/.*)?$/i,
 
   // uploaded static files
@@ -56,7 +77,9 @@ const PUBLIC_GET_ALLOWLIST: RegExp[] = [
   /^\/swagger-ui(?:\/.*)?$/i,
 ];
 
-/** DEV: log outgoing requests */
+/* -----------------------------------------------------------------------------
+   Request interceptor: attach JWT except for public GETs
+----------------------------------------------------------------------------- */
 api.interceptors.request.use((config) => {
   const rawUrl = config.url ?? "";
   const isAbsolute = /^https?:\/\//i.test(rawUrl);
@@ -70,39 +93,40 @@ api.interceptors.request.use((config) => {
     const token = getToken();
     if (token) {
       config.headers = (config.headers ?? {}) as AxiosRequestHeaders;
-  if (token) {
-  (config.headers as AxiosRequestHeaders).Authorization = `Bearer ${token}`;
-  }
+      (config.headers as AxiosRequestHeaders).Authorization = `Bearer ${token}`;
     }
   }
 
-  if (import.meta.env.DEV) {
+  if ((import.meta as any)?.env?.DEV) {
     // eslint-disable-next-line no-console
     console.log(
       "[API REQUEST]",
       (config.method || "GET").toUpperCase(),
       isAbsolute ? rawUrl : `${API_BASE}${rawUrl}`,
-      config.headers?.Authorization ? "(auth✓)" : "(public)"
+      (config.headers as any)?.Authorization ? "(auth✓)" : "(public)"
     );
   }
 
   return config;
 });
 
-/** Hook so AuthProvider can be notified on 401/403 to logout immediately. */
+/* -----------------------------------------------------------------------------
+   Unauthorized (401/403) handler hook
+----------------------------------------------------------------------------- */
 let onUnauthorized: null | ((status: number, data?: any) => void) = null;
 
-/** Allow AuthProvider to register a global unauthorized handler. */
 export function registerUnauthorizedHandler(
   fn: (status: number, data?: any) => void
 ) {
   onUnauthorized = fn;
 }
 
-/** Log concise errors (method, fully-resolved URL, status, message). */
+/* -----------------------------------------------------------------------------
+   Response interceptor: concise error logs + unauthorized hook
+----------------------------------------------------------------------------- */
 api.interceptors.response.use(
   (res) => {
-    if (import.meta.env.DEV) {
+    if ((import.meta as any)?.env?.DEV) {
       // eslint-disable-next-line no-console
       console.log(
         "[API RESPONSE]",
@@ -135,20 +159,27 @@ api.interceptors.response.use(
   }
 );
 
-/* -------------------- tiny fetch helpers (safe on empty 201/204) -------------------- */
-
+/* -----------------------------------------------------------------------------
+   Tiny JSON helpers (normalize empty 201/204 responses to null)
+----------------------------------------------------------------------------- */
 function normalizeData<T = any>(data: any): T {
-  // For 201/204 many servers return empty string; normalize to null to avoid crashes
   if (data === "" || data === undefined) return null as any;
   return data as T;
 }
 
-export async function getJSON<T>(url: string, cfg?: AxiosRequestConfig): Promise<T> {
+export async function getJSON<T>(
+  url: string,
+  cfg?: AxiosRequestConfig
+): Promise<T> {
   const res = await api.get<T>(url, cfg);
   return normalizeData<T>(res.data);
 }
 
-export async function postJSON<T>(url: string, body?: unknown, cfg?: AxiosRequestConfig): Promise<T> {
+export async function postJSON<T>(
+  url: string,
+  body?: unknown,
+  cfg?: AxiosRequestConfig
+): Promise<T> {
   const res = await api.post<T>(url, body, {
     headers: { "Content-Type": "application/json" },
     ...(cfg || {}),
@@ -156,7 +187,11 @@ export async function postJSON<T>(url: string, body?: unknown, cfg?: AxiosReques
   return normalizeData<T>(res.data);
 }
 
-export async function putJSON<T>(url: string, body?: unknown, cfg?: AxiosRequestConfig): Promise<T> {
+export async function putJSON<T>(
+  url: string,
+  body?: unknown,
+  cfg?: AxiosRequestConfig
+): Promise<T> {
   const res = await api.put<T>(url, body, {
     headers: { "Content-Type": "application/json" },
     ...(cfg || {}),
@@ -164,7 +199,11 @@ export async function putJSON<T>(url: string, body?: unknown, cfg?: AxiosRequest
   return normalizeData<T>(res.data);
 }
 
-export async function patchJSON<T>(url: string, body?: unknown, cfg?: AxiosRequestConfig): Promise<T> {
+export async function patchJSON<T>(
+  url: string,
+  body?: unknown,
+  cfg?: AxiosRequestConfig
+): Promise<T> {
   const res = await api.patch<T>(url, body, {
     headers: { "Content-Type": "application/json" },
     ...(cfg || {}),
@@ -172,7 +211,10 @@ export async function patchJSON<T>(url: string, body?: unknown, cfg?: AxiosReque
   return normalizeData<T>(res.data);
 }
 
-export async function deleteJSON<T>(url: string, cfg?: AxiosRequestConfig): Promise<T> {
+export async function deleteJSON<T>(
+  url: string,
+  cfg?: AxiosRequestConfig
+): Promise<T> {
   const res = await api.delete<T>(url, cfg);
   return normalizeData<T>(res.data);
 }
