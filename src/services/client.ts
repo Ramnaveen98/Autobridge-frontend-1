@@ -12,7 +12,7 @@ import type { AxiosRequestHeaders } from "axios";
    1) window.__API_BASE__              (runtime override without rebuild)
    2) import.meta.env.VITE_API_BASE    (Vite build-time env)
    3) <meta name="autobridge-api-base" content="https://..."> (index.html)
-   4) Cloud Run default (edit if you prefer another fallback)
+   4) default Cloud Run URL (edit if you prefer another fallback)
 ----------------------------------------------------------------------------- */
 const metaApiBase =
   typeof document !== "undefined"

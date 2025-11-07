@@ -2,11 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Optional meta fallback (client.ts priority #3) -->
+    <meta
+      name="autobridge-api-base"
+      content="https://javaspringboot-project-tpy3lssbpa-uc.a.run.app"
+    />
     <title>Autobridge</title>
   </head>
-  <body class="bg-blue-950 text-blue-50">
+  <body>
     <div id="root"></div>
+    <!-- Optional runtime override hook (client.ts priority #1) -->
+    <script src="/runtime-config.js"></script>
+    <!-- Your app entry -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
