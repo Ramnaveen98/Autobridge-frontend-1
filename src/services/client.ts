@@ -25,7 +25,7 @@ const DEFAULT_API_BASE =
   (typeof window !== "undefined" && (window as any).__API_BASE__) ||
   (import.meta as any)?.env?.VITE_API_BASE ||
   metaApiBase ||
-  "https://javaspringboot-project-tpy3lssbpa-uc.a.run.app";
+  "hhttps://javaspringboot-project-22420323301.us-central1.run.app";
 
 export const API_BASE = String(DEFAULT_API_BASE).replace(/\/$/, "");
 
