@@ -42,10 +42,14 @@ export async function leaveFeedback(
   requestId: number,
   payload: LeaveFeedbackPayload
 ): Promise<FeedbackRow | void> {
-  const { data } = await api.post<FeedbackRow | undefined>("/api/v1/feedback", {
-    requestId,
-    ...payload,
-  });
+  // FIX: use backend route /api/v1/requests/{requestId}/feedback
+  const { data } = await api.post<FeedbackRow | undefined>(
+    `/api/v1/requests/${requestId}/feedback`,
+    {
+      rating: payload.rating,
+      comment: payload.comment,
+    }
+  );
   if (data) return normalizeRows([data])[0];
 }
 

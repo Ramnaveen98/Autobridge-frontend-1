@@ -1,9 +1,5 @@
 // src/services/client.ts
-import axios, {
-  AxiosError,
-  AxiosInstance,
-  AxiosRequestConfig,
-} from "axios";
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 import type { AxiosRequestHeaders } from "axios";
 
 /* -----------------------------------------------------------------------------
@@ -12,7 +8,7 @@ import type { AxiosRequestHeaders } from "axios";
    1) window.__API_BASE__              (runtime override without rebuild)
    2) import.meta.env.VITE_API_BASE    (Vite build-time env)
    3) <meta name="autobridge-api-base" content="https://..."> (index.html)
-   4) default Cloud Run URL (edit if you prefer another fallback)
+   4) default Cloud Run URL (fallback)
 ----------------------------------------------------------------------------- */
 const metaApiBase =
   typeof document !== "undefined"
@@ -25,7 +21,8 @@ const DEFAULT_API_BASE =
   (typeof window !== "undefined" && (window as any).__API_BASE__) ||
   (import.meta as any)?.env?.VITE_API_BASE ||
   metaApiBase ||
-  "hhttps://javaspringboot-project-22420323301.us-central1.run.app";
+  // FIX: 'hhttps' -> 'https'
+  "https://javaspringboot-project-22420323301.us-central1.run.app";
 
 export const API_BASE = String(DEFAULT_API_BASE).replace(/\/$/, "");
 
@@ -35,7 +32,8 @@ export const API_BASE = String(DEFAULT_API_BASE).replace(/\/$/, "");
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE,
   withCredentials: false,
-  timeout: 15000,
+  // Bump timeout to reduce false timeouts when instance is warming
+  timeout: 30000,
   headers: {
     Accept: "application/json, text/plain, */*",
   },
