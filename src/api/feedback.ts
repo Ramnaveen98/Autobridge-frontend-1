@@ -6,8 +6,8 @@ export type FeedbackRow = {
   requestId: number;
   rating: number;
   comment: string;
-  createdAtUtc?: string | null;   // backend name
-  createdAt?: string | null;      // legacy fallback
+  createdAtUtc?: string | null;
+  createdAt?: string | null;
   acknowledged?: boolean;
   acknowledgedBy?: string | null;
   acknowledgedAt?: string | null;
@@ -27,7 +27,6 @@ type PageResponse<T> = {
 function normalizeRows(rows: FeedbackRow[]): FeedbackRow[] {
   return rows.map((r) => ({
     ...r,
-    // present both so UI can read either
     createdAt: r.createdAt ?? r.createdAtUtc ?? null,
   }));
 }
@@ -42,13 +41,10 @@ export async function leaveFeedback(
   requestId: number,
   payload: LeaveFeedbackPayload
 ): Promise<FeedbackRow | void> {
-  // FIX: use backend route /api/v1/requests/{requestId}/feedback
+  // ✅ match backend controller: POST /api/v1/requests/{requestId}/feedback
   const { data } = await api.post<FeedbackRow | undefined>(
     `/api/v1/requests/${requestId}/feedback`,
-    {
-      rating: payload.rating,
-      comment: payload.comment,
-    }
+    { rating: payload.rating, comment: payload.comment }
   );
   if (data) return normalizeRows([data])[0];
 }
@@ -77,7 +73,6 @@ export async function listAgentFeedback(page = 0, size = 50): Promise<FeedbackRo
   return normalizeRows(list);
 }
 
-/** ✅ Aggregated API object so you can `import { feedbackApi } ...` */
 export const feedbackApi = {
   leave: leaveFeedback,
   listAllFeedback,
